@@ -1,0 +1,5 @@
+# Dev uniquement : rend la base accessible depuis le PC (port 5433).
+services:
+  db:
+    ports:
+      - "5433:5432"

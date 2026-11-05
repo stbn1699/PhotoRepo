@@ -15,11 +15,20 @@ Photographie/
 ```
 
 - Seuls les dossiers qui commencent par une date sont pris en compte.
-- Le **numéro** de l'image est le nombre après le dernier `_` : c'est lui qui relie l'originale, la carrée et la story.
-- Les noms de sous-dossiers ne tiennent pas compte des majuscules (`Original` marche aussi).
+- Le **numéro** de l'image est le dernier nombre du nom, juste avant l'extension (`glam-street_carre_12.jpg` → 12). C'est lui qui relie l'originale, la carrée et la story.
+- S'il n'y a pas de sous-dossier `original`, les photos posées directement dans le dossier du shooting sont prises comme originales.
+- Noms de sous-dossiers acceptés, sans tenir compte des majuscules ni des accents : `original` / `originale`, `carre` / `carré` / `square`, `story` / `storyInsta`.
+- Une carrée ou une story sans originale du même numéro est ignorée. Si deux fichiers ont le même numéro dans la même version, seul le premier est gardé : l'admin voit la liste des fichiers ignorés en haut de la galerie.
 - Le site relit les dossiers au démarrage puis toutes les 5 minutes (bouton « Relire les dossiers » pour l'admin).
 - Un nouveau dossier est **caché pour tout le monde** sauf l'admin, tant qu'on n'a pas donné l'accès.
 - Le dossier Photographie est monté **en lecture seule** : le site ne modifie jamais les photos.
+
+## Galerie et téléchargements
+
+- La galerie affiche des miniatures (800 px) et la vue en grand un aperçu (2048 px). Les deux sont générés une fois puis gardés dans `data/cache`. Dès qu'un shooting apparaît, le serveur les prépare en arrière-plan.
+- Les téléchargements donnent **toujours le fichier d'origine**.
+- **Téléphone** : le site ouvre le menu « Partager » → « Enregistrer les images », et les photos vont directement dans la galerie du téléphone. Par paquets de 10 photos / 150 Mo maximum. Nécessite HTTPS.
+- **Ordinateur** : enregistrement dans un dossier choisi (Chrome, Edge), ou une par une dans Téléchargements.
 
 ## Installation sur le Synology (Container Manager)
 
@@ -42,22 +51,25 @@ Prérequis : Node 22+ et Docker.
 
 ```bash
 cp .env.example .env               # puis adapte les valeurs
-docker compose up -d db            # seulement la base (ajoute "ports: [5432:5432]" au service db si besoin)
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d db   # la base, sur le port 5433
 npm install
 npm run dev                        # site sur http://localhost:5173, API sur :3000
 ```
+
+En dev, `PHOTOS_ROOT` peut pointer directement sur le partage du NAS (`//192.168.1.89/Photographie`).
 
 Ou tout en Docker, comme sur le NAS : `docker compose up -d --build` puis http://localhost:8080.
 
 ## Technique
 
 - `server/` : Node + TypeScript (Fastify), PostgreSQL. Mots de passe hashés avec Argon2, sessions par cookie `httpOnly`, max 10 tentatives de connexion par 15 min et par IP.
+- Miniatures avec `sharp`, 2 conversions en parallèle au maximum (`IMAGE_CONCURRENCY`), pour ne pas saturer le NAS.
 - `web/` : React + TypeScript (Vite).
 - Une seule image Docker sert l'API et le site.
 
 ## Avancement
 
 - [x] Étape 1 : connexion, compte admin, lecture des dossiers, liste des shootings
-- [ ] Étape 2 : galerie (miniatures, vue en grand, versions originale / carrée / story, téléchargements)
+- [x] Étape 2 : galerie (miniatures, vue en grand, versions originale / carrée / story, téléchargements)
 - [ ] Étape 3 : administration (utilisateurs, accès aux shootings)
 - [ ] Étape 4 : page de suivi (qui a vu / téléchargé quoi). Les événements sont déjà enregistrés en base.

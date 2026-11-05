@@ -6,3 +6,4 @@ dev-photos/
 *.log
 .idea/
 *.tsbuildinfo
+.claude/

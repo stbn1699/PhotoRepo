@@ -17,9 +17,13 @@ function required(name: string): string {
 }
 
 export const config = {
-  port: Number(process.env.PORT ?? 3000),
+  port: Number(process.env.API_PORT ?? 3000),
   databaseUrl: required('DATABASE_URL'),
   photosRoot: path.resolve(required('PHOTOS_ROOT')),
+  // Miniatures et aperçus générés (peut être vidé sans risque, tout se régénère).
+  cacheDir: path.resolve(process.env.CACHE_DIR || './cache'),
+  // Nombre d'images converties en même temps (2 convient bien à un NAS).
+  imageConcurrency: Math.max(1, Number(process.env.IMAGE_CONCURRENCY ?? 2)),
   siteName: process.env.SITE_NAME || 'Galerie',
   adminUsername: process.env.ADMIN_USERNAME || undefined,
   adminPassword: process.env.ADMIN_PASSWORD || undefined,

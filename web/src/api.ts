@@ -46,3 +46,40 @@ export function formatShootingDate(s: Pick<Shooting, 'date' | 'datePrecision'>):
     ? date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
     : date.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
 }
+
+export type Version = 'original' | 'carre' | 'story';
+export const VERSIONS: Version[] = ['original', 'carre', 'story'];
+export const VERSION_LABELS: Record<Version, string> = { original: 'Originale', carre: 'Carré', story: 'Story' };
+
+export interface ImageVersionInfo {
+  width: number;
+  height: number;
+  size: number;
+  name: string;
+  token: string; // change quand le fichier change (cache navigateur)
+}
+
+export interface GalleryImage {
+  number: number;
+  versions: Partial<Record<Version, ImageVersionInfo>>;
+}
+
+export interface ShootingDetail {
+  shooting: Shooting;
+  images: GalleryImage[];
+  duplicates?: string[];
+}
+
+export function imageUrl(
+  shootingId: number,
+  number: number,
+  version: Version,
+  kind: 'thumb' | 'preview',
+  token: string,
+): string {
+  return `/api/shootings/${shootingId}/images/${number}/${version}/${kind}?v=${token}`;
+}
+
+export function originalUrl(shootingId: number, number: number, version: Version, batch = false): string {
+  return `/api/shootings/${shootingId}/images/${number}/${version}/original?download=1${batch ? '&batch=1' : ''}`;
+}

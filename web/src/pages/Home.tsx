@@ -52,7 +52,16 @@ export function HomePage() {
       <div className="shooting-grid">
         {shootings?.map((s) => (
           <Link key={s.id} to={`/shooting/${s.id}`} className="shooting-card">
-            <div className="shooting-cover" aria-hidden />
+            <div className="shooting-cover" aria-hidden>
+              {s.imageCount > 0 && (
+                <img
+                  src={`/api/shootings/${s.id}/cover`}
+                  alt=""
+                  loading="lazy"
+                  onError={(e) => (e.currentTarget.style.display = 'none')}
+                />
+              )}
+            </div>
             <div className="shooting-info">
               <h2>{s.title}</h2>
               <p className="muted">

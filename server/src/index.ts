@@ -10,6 +10,8 @@ import { ensureAdmin, loadSession } from './auth.js';
 import { scanLibrary } from './library.js';
 import { authRoutes } from './routes/auth.js';
 import { shootingRoutes } from './routes/shootings.js';
+import { galleryRoutes } from './routes/gallery.js';
+import { warmCache } from './images.js';
 
 const app = Fastify({
   logger: { level: process.env.LOG_LEVEL ?? 'info' },
@@ -34,6 +36,7 @@ app.get('/api/site', async () => ({ name: config.siteName }));
 
 await app.register(authRoutes);
 await app.register(shootingRoutes);
+await app.register(galleryRoutes);
 
 // En production, le même serveur sert le site React compilé.
 if (config.webDist && fs.existsSync(config.webDist)) {
@@ -57,9 +60,11 @@ async function runScan(): Promise<void> {
     app.log.info(result, 'Dossiers scannés');
   } catch (err) {
     app.log.error(err, `Impossible de lire ${config.photosRoot}`);
+    return;
   }
+  // Prépare les miniatures en tâche de fond (sans bloquer le site).
+  warmCache(app.log).catch((err) => app.log.error(err, 'Erreur pendant la préparation des images'));
 }
-await runScan();
 const scanTimer = setInterval(runScan, config.scanIntervalMinutes * 60 * 1000);
 
 // Ménage des sessions expirées, une fois par jour.
@@ -79,3 +84,5 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
 }
 
 await app.listen({ port: config.port, host: '0.0.0.0' });
+// Premier scan après le démarrage, pour que le site réponde tout de suite.
+void runScan();
