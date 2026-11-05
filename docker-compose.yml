@@ -17,6 +17,8 @@ services:
 
   app:
     build: .
+    # Nom de l'image construite (c'est elle qu'on exporte en .tar pour le NAS).
+    image: photorepo-app:latest
     container_name: photorepo-app
     restart: unless-stopped
     depends_on:

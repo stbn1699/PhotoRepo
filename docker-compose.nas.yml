@@ -1,0 +1,45 @@
+# Version pour le NAS : utilise l'image importée depuis photorepo-app.tar (pas besoin du code source).
+# Sur le NAS, place ce fichier dans le dossier du projet sous le nom docker-compose.yml, à côté du .env.
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: photorepo-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: photorepo
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD manquant dans .env}
+      POSTGRES_DB: photorepo
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    ports:
+      # Accès à la base depuis le réseau local (DBeaver…). Ne pas rediriger ce port sur ta box.
+      - "${DB_PORT:-3012}:5432"
+    healthcheck:
+      # Via le réseau (127.0.0.1) : pendant l'initialisation, Postgres n'écoute que localement.
+      test: ["CMD-SHELL", "pg_isready -U photorepo -h 127.0.0.1"]
+      interval: 5s
+      retries: 10
+
+  app:
+    image: photorepo-app:latest
+    pull_policy: never # l'image vient du .tar, pas d'Internet
+    container_name: photorepo-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://photorepo:${DB_PASSWORD}@db:5432/photorepo
+      SITE_NAME: ${SITE_NAME:-Galerie}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      SCAN_INTERVAL_MINUTES: ${SCAN_INTERVAL_MINUTES:-5}
+      IMAGE_CONCURRENCY: ${IMAGE_CONCURRENCY:-2}
+    volumes:
+      # Le lecteur Photographie, en lecture seule : le site ne modifie jamais tes photos.
+      - ${PHOTOS_PATH:?PHOTOS_PATH manquant dans .env}:/photos:ro
+      # Miniatures et aperçus générés (peut être supprimé : tout se régénère).
+      - ./data/cache:/cache
+    ports:
+      # Le site : c'est ce port que vise le reverse proxy.
+      - "${APP_PORT:-3011}:3000"

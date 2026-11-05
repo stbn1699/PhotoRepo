@@ -50,10 +50,29 @@ Bouton **Admin** en haut du site (visible seulement par l'admin) :
 
 ## Installation sur le Synology (Container Manager)
 
-1. Copie le projet sur le NAS (par exemple `/volume1/docker/photorepo`), avec `git clone` ou File Station.
-2. Copie `.env.example` en `.env` et remplis-le : nom du site, compte admin, mot de passe de la base, `PHOTOS_PATH` (en général `/volume1/Photographie`) et `APP_PORT`.
-3. Container Manager → **Projet** → **Créer** → choisis le dossier du projet : il trouve `docker-compose.yml`. Lance la construction.
-4. Le site répond sur `http://IP-DU-NAS:APP_PORT`. Configure ton reverse proxy (HTTPS + nom de domaine) vers ce port.
+### 1. Préparer l'image sur le PC
+
+```bash
+docker compose build app
+docker save photorepo-app:latest -o photorepo-app.tar
+```
+
+À refaire à chaque mise à jour du code.
+
+### 2. Copier sur le NAS
+
+Dans un dossier du NAS (par exemple `/volume1/docker/photorepo`), copie :
+
+- `docker-compose.nas.yml`, **renommé en `docker-compose.yml`** (il utilise l'image du `.tar`, sans le code source) ;
+- `.env`, copié depuis `.env.example` puis rempli : nom du site, compte admin, mot de passe de la base, `PHOTOS_PATH` (en général `/volume1/Photographie`) ;
+- `photorepo-app.tar`.
+
+### 3. Lancer
+
+1. Container Manager → **Image** → **Ajouter** → **Ajouter à partir d'un fichier** → `photorepo-app.tar`.
+2. Container Manager → **Projet** → **Créer** → choisis le dossier : il trouve `docker-compose.yml` et `.env`. L'image Postgres est téléchargée automatiquement.
+3. Le site répond sur `http://IP-DU-NAS:3011`. Configure ton reverse proxy (HTTPS + nom de domaine) vers ce port.
+4. La base est accessible depuis le réseau local sur le port **3012** (DBeaver : base `photorepo`, utilisateur `photorepo`, mot de passe `DB_PASSWORD`). **Ne redirige pas ce port sur ta box.**
 
 Le compte admin est créé au premier démarrage. Pour changer son mot de passe ou recréer un admin :
 
@@ -61,7 +80,7 @@ Le compte admin est créé au premier démarrage. Pour changer son mot de passe 
 docker exec -it photorepo-app node dist/cli/create-admin.js <pseudo> <nouveau-mot-de-passe>
 ```
 
-Mise à jour : récupère la nouvelle version du code puis, dans Container Manager, **Projet → Action → Construire** (la base de données est conservée dans `data/postgres`).
+Mise à jour : génère un nouveau `.tar`, importe-le dans Container Manager (**Image → Ajouter**), puis redémarre le projet. La base de données est conservée dans `data/postgres`.
 
 ## Développement
 

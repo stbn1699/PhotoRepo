@@ -7,3 +7,5 @@ dev-photos/
 .idea/
 *.tsbuildinfo
 .claude/
+*.tar
+nas-deploy/
