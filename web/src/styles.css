@@ -1085,3 +1085,72 @@ a.btn {
     height: 38px;
   }
 }
+
+/* Effet de chargement « fantôme » : blocs gris avec un reflet qui passe */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+  animation: skeleton-shine 1.4s ease-in-out infinite;
+}
+@keyframes skeleton-shine {
+  to {
+    transform: translateX(100%);
+  }
+}
+.skeleton-card {
+  pointer-events: none;
+}
+.skeleton-card .shooting-info {
+  gap: 10px;
+  padding-top: 16px;
+}
+.skeleton-line {
+  height: 14px;
+  border-radius: 7px;
+}
+.skeleton-line-small {
+  height: 11px;
+  margin-top: 8px;
+}
+.skeleton-title {
+  height: 30px;
+  border-radius: 8px;
+}
+.skeleton-pill {
+  height: 38px;
+  border-radius: 99px;
+  max-width: 45%;
+}
+.skeleton-fill {
+  position: absolute;
+  inset: 0;
+}
+.tile.skeleton {
+  cursor: default;
+}
+.shooting-cover {
+  position: relative;
+}
+.fade-image {
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+.fade-image.is-loaded {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after {
+    animation: none;
+  }
+  .fade-image {
+    transition: none;
+  }
+}

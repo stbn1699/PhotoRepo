@@ -221,14 +221,26 @@ export interface ScanResult {
 }
 
 let scanning: Promise<ScanResult> | null = null;
+let lastScanAt = 0;
 
 /** Parcourt le dossier racine et met à jour la table des shootings. */
 export function scanLibrary(): Promise<ScanResult> {
   // Un seul scan à la fois : un appel pendant un scan en cours attend le même résultat.
   scanning ??= doScan().finally(() => {
     scanning = null;
+    lastScanAt = Date.now();
   });
   return scanning;
+}
+
+/**
+ * Relit les dossiers si la dernière lecture date de plus de `maxAgeMs`
+ * (évite de relire le NAS à chaque visite de l'accueil). Renvoie null si rien n'a été relu.
+ */
+export async function refreshLibrary(maxAgeMs: number): Promise<ScanResult | null> {
+  if (scanning) return scanning;
+  if (Date.now() - lastScanAt < maxAgeMs) return null;
+  return scanLibrary();
 }
 
 async function doScan(): Promise<ScanResult> {

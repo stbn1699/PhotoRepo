@@ -19,7 +19,7 @@ Photographie/
 - S'il n'y a pas de sous-dossier `original`, les photos posées directement dans le dossier du shooting sont prises comme originales.
 - Noms de sous-dossiers acceptés, sans tenir compte des majuscules ni des accents : `original` / `originale`, `carre` / `carré` / `square`, `story` / `storyInsta`.
 - Une carrée ou une story sans originale du même numéro est ignorée. Si deux fichiers ont le même numéro dans la même version, seul le premier est gardé : l'admin voit la liste des fichiers ignorés en haut de la galerie.
-- Le site relit les dossiers au démarrage puis toutes les 5 minutes (bouton « Relire les dossiers » pour l'admin).
+- Le site relit les dossiers au démarrage, toutes les 5 minutes, et à chaque arrivée sur l'accueil (au plus une fois toutes les 15 secondes). L'admin a aussi un bouton « Relire les dossiers ».
 - Un nouveau dossier est **caché pour tout le monde** sauf l'admin, tant qu'on n'a pas donné l'accès.
 - Le dossier Photographie est monté **en lecture seule** : le site ne modifie jamais les photos.
 
@@ -75,6 +75,8 @@ npm run dev                        # site sur http://localhost:5173, API sur :30
 ```
 
 En dev, `PHOTOS_ROOT` peut pointer directement sur le partage du NAS (`//192.168.1.89/Photographie`).
+
+⚠️ Ne fais pas tourner en même temps le mode dev et le conteneur `photorepo-app` sur la même base : chacun relit ses propres dossiers et masque ceux de l'autre, ce qui fait apparaître et disparaître des shootings.
 
 Ou tout en Docker, comme sur le NAS : `docker compose up -d --build` puis http://localhost:8080.
 

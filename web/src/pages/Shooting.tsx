@@ -14,6 +14,7 @@ import {
 } from '../api';
 import { DownloadDialog } from '../components/DownloadDialog';
 import { Lightbox } from '../components/Lightbox';
+import { FadeImage } from '../components/FadeImage';
 import { canShareFiles, triggerDownload, type DownloadItem } from '../downloads';
 
 export function ShootingPage() {
@@ -92,7 +93,7 @@ export function ShootingPage() {
       </>
     );
   }
-  if (!data) return <p className="muted">Chargement…</p>;
+  if (!data) return <GallerySkeleton />;
 
   const allSelected = images.length > 0 && selected.size === images.length;
 
@@ -179,7 +180,7 @@ export function ShootingPage() {
               aria-pressed={selecting ? isSelected : undefined}
               aria-label={`Photo ${img.number}`}
             >
-              <img
+              <FadeImage
                 src={imageUrl(id, img.number, version, 'thumb', info.token)}
                 alt=""
                 loading="lazy"
@@ -221,6 +222,36 @@ export function ShootingPage() {
 
       {downloadItems && <DownloadDialog items={downloadItems} onClose={() => setDownloadItems(null)} />}
     </>
+  );
+}
+
+/** Galerie « fantôme » affichée pendant le chargement. */
+function GallerySkeleton() {
+  // Proportions variées (photos horizontales et verticales) pour imiter une vraie galerie.
+  const ratios = [1.5, 0.67, 1.5, 1.5, 0.67, 0.67, 1.5, 1, 1.5, 0.67, 1.5, 1.5, 0.67, 1.5, 0.67, 1.5];
+  return (
+    <div aria-busy="true">
+      <BackLink />
+      <div className="gallery-header">
+        <div style={{ width: '100%' }}>
+          <div className="skeleton skeleton-line skeleton-title" style={{ width: 'min(340px, 70%)' }} />
+          <div className="skeleton skeleton-line skeleton-line-small" style={{ width: 160 }} />
+        </div>
+      </div>
+      <div className="gallery-toolbar">
+        <div className="skeleton skeleton-pill" style={{ width: 260 }} />
+        <div className="skeleton skeleton-pill" style={{ width: 200 }} />
+      </div>
+      <div className="justified">
+        {ratios.map((ratio, i) => (
+          <div
+            key={i}
+            className="tile skeleton"
+            style={{ flexGrow: ratio, flexBasis: `calc(var(--row-h) * ${ratio})`, aspectRatio: ratio }}
+          />
+        ))}
+      </div>
+    </div>
   );
 }
 
