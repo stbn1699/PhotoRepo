@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.env
+data/
+dev-photos/
+*.log
+.idea/
+*.tsbuildinfo
