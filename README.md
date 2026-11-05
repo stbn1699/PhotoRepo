@@ -37,6 +37,11 @@ Bouton **Admin** en haut du site (visible seulement par l'admin) :
 - **Utilisateurs** → **Nouvel utilisateur** : pseudo, nom affiché, mot de passe généré automatiquement. Le site prépare le message à envoyer à la modèle (adresse, pseudo, mot de passe).
 - **Fiche d'un utilisateur** : cocher les shootings qu'il peut voir (enregistré automatiquement), changer son nom ou son mot de passe (ça le déconnecte), désactiver ou supprimer le compte. L'historique est conservé.
 - **Accès par shooting** : pour chaque shooting, cocher les personnes qui y ont accès. Le bouton **Gérer l'accès** de chaque galerie y mène directement.
+- **Suivi** : qui a ouvert quelle galerie, regardé quelles photos en grand et téléchargé quoi.
+  - Filtres par personne, shooting et période (tes propres actions sont masquées par défaut).
+  - **Résumé** par personne et par shooting, avec un **détail photo par photo** : vue, téléchargée (dans quelle version) ou jamais ouverte.
+  - **Journal** chronologique : les actions faites d'affilée sont regroupées (« a téléchargé 12 photos de… »), avec les connexions et les tentatives ratées.
+  - Une photo compte comme « vue » quand elle reste affichée en grand au moins une seconde.
 
 ## Installation sur le Synology (Container Manager)
 
@@ -80,4 +85,4 @@ Ou tout en Docker, comme sur le NAS : `docker compose up -d --build` puis http:/
 - [x] Étape 1 : connexion, compte admin, lecture des dossiers, liste des shootings
 - [x] Étape 2 : galerie (miniatures, vue en grand, versions originale / carrée / story, téléchargements)
 - [x] Étape 3 : administration (utilisateurs, accès aux shootings)
-- [ ] Étape 4 : page de suivi (qui a vu / téléchargé quoi). Les événements sont déjà enregistrés en base.
+- [x] Étape 4 : page de suivi (qui a vu / téléchargé quoi)

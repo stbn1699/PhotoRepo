@@ -12,6 +12,7 @@ import { authRoutes } from './routes/auth.js';
 import { shootingRoutes } from './routes/shootings.js';
 import { galleryRoutes } from './routes/gallery.js';
 import { adminRoutes } from './routes/admin.js';
+import { activityRoutes } from './routes/activity.js';
 import { warmCache } from './images.js';
 
 const app = Fastify({
@@ -47,6 +48,7 @@ await app.register(authRoutes);
 await app.register(shootingRoutes);
 await app.register(galleryRoutes);
 await app.register(adminRoutes);
+await app.register(activityRoutes);
 
 // En production, le même serveur sert le site React compilé.
 if (config.webDist && fs.existsSync(config.webDist)) {

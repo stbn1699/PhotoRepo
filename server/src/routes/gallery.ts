@@ -150,20 +150,45 @@ export async function galleryRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const file = await getRendition(image, kind as Rendition);
-      if (kind === 'preview') {
-        await logEvent({
-          userId: user.id,
-          type: 'view_image',
-          shootingId: shooting.id,
-          imageNumber: number,
-          version,
-          ip: request.ip,
-        });
-      }
       // L'URL contient un jeton qui change avec le fichier : le navigateur peut garder l'image longtemps.
       reply.header('Cache-Control', 'private, max-age=31536000, immutable');
       const stat = await fs.promises.stat(file);
       return sendFile(reply, file, stat.size, 'image/webp');
+    },
+  );
+
+  /**
+   * Signale qu'une photo a été affichée en grand. Envoyé par le site au moment où la photo
+   * est vraiment montrée (les photos voisines préchargées ne comptent pas).
+   */
+  app.post<{ Params: { id: number; number: number; version: string } }>(
+    '/api/shootings/:id/images/:number/:version/view',
+    {
+      preHandler: requireUser,
+      config: { rateLimit: { max: 600, timeWindow: '1 minute' } },
+      schema: {
+        params: {
+          type: 'object',
+          properties: {
+            id: idParam,
+            number: { type: 'integer', minimum: 0, maximum: 2147483647 },
+            version: { type: 'string', enum: [...VERSIONS] },
+          },
+          required: ['id', 'number', 'version'],
+        },
+      },
+    },
+    async (request, reply) => {
+      const user = request.user!;
+      const { id, number, version } = request.params;
+      if (!isVersion(version)) return reply.code(400).send({ error: 'Version inconnue' });
+      const shooting = await findAccessibleShooting(user, id);
+      if (!shooting) return reply.code(404).send({ error: 'Image introuvable' });
+      if (!(await getShootingIndex(shooting.folder_name)).images.get(number)?.[version]) {
+        return reply.code(404).send({ error: 'Image introuvable' });
+      }
+      await logEvent({ userId: user.id, type: 'view_image', shootingId: shooting.id, imageNumber: number, version, ip: request.ip });
+      return { ok: true };
     },
   );
 

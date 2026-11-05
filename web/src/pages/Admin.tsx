@@ -12,13 +12,14 @@ import { useAuth } from '../auth';
 import { AccessList } from '../components/AccessList';
 import { generatePassword, PasswordField } from '../components/PasswordField';
 
-function AdminTabs() {
+export function AdminTabs() {
   return (
     <div className="page-header">
       <h1>Administration</h1>
       <nav className="tabs">
         <NavLink to="/admin/users">Utilisateurs</NavLink>
         <NavLink to="/admin/shootings">Accès par shooting</NavLink>
+        <NavLink to="/admin/activity">Suivi</NavLink>
       </nav>
     </div>
   );
@@ -329,6 +330,9 @@ export function AdminUserPage() {
             {formatDateTime(user.lastLoginAt)}
           </p>
         </div>
+        <Link to={`/admin/activity?userId=${user.id}${user.isAdmin ? '&includeAdmin=1' : ''}`} className="btn btn-ghost">
+          Voir son activité
+        </Link>
       </div>
 
       {notice && <p className="notice">{notice}</p>}

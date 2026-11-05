@@ -7,6 +7,7 @@ import { HomePage } from './pages/Home';
 import { ShootingPage } from './pages/Shooting';
 import { Layout } from './Layout';
 import { AdminShootingsPage, AdminUserPage, AdminUsersPage } from './pages/Admin';
+import { ActivityDetailPage, ActivityPage } from './pages/Activity';
 import './styles.css';
 
 /** Toute page protégée renvoie vers /login si on n'est pas connecté. */
@@ -37,6 +38,8 @@ createRoot(document.getElementById('root')!).render(
           <Route path="/admin/users" element={<Protected><AdminOnly><AdminUsersPage /></AdminOnly></Protected>} />
           <Route path="/admin/users/:id" element={<Protected><AdminOnly><AdminUserPage /></AdminOnly></Protected>} />
           <Route path="/admin/shootings" element={<Protected><AdminOnly><AdminShootingsPage /></AdminOnly></Protected>} />
+          <Route path="/admin/activity" element={<Protected><AdminOnly><ActivityPage /></AdminOnly></Protected>} />
+          <Route path="/admin/activity/:userId/:shootingId" element={<Protected><AdminOnly><ActivityDetailPage /></AdminOnly></Protected>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AuthProvider>

@@ -110,3 +110,47 @@ export function formatDateTime(iso: string | null): string {
   if (!iso) return 'jamais';
   return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' });
 }
+
+export interface ActivitySummaryRow {
+  userId: number;
+  username: string;
+  displayName: string | null;
+  shootingId: number;
+  title: string;
+  imageCount: number;
+  visits: number;
+  viewed: number;
+  downloaded: number;
+  lastAt: string;
+}
+
+export type ActivityEventType =
+  | 'login'
+  | 'login_failed'
+  | 'logout'
+  | 'view_shooting'
+  | 'view_image'
+  | 'download_image'
+  | 'download_zip';
+
+export interface ActivityEvent {
+  id: number;
+  type: ActivityEventType;
+  at: string;
+  userId: number | null;
+  username: string | null;
+  displayName: string | null;
+  shootingId: number | null;
+  title: string | null;
+  number: number | null;
+  version: Version | null;
+  details: { username?: string; deletedUser?: string; batch?: boolean } | null;
+  ip: string | null;
+}
+
+export interface ActivityDetail {
+  user: { id: number; username: string; displayName: string | null };
+  shooting: { id: number; title: string };
+  images: { number: number; version: Version; type: 'view_image' | 'download_image'; count: number; firstAt: string; lastAt: string }[];
+  visits: { count: number; firstAt: string | null; lastAt: string | null };
+}

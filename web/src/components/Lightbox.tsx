@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { imageUrl, VERSION_LABELS, VERSIONS, type GalleryImage, type Version } from '../api';
+import { api, imageUrl, VERSION_LABELS, VERSIONS, type GalleryImage, type Version } from '../api';
 
 interface Props {
   shootingId: number;
@@ -24,6 +24,14 @@ export function Lightbox({ shootingId, images, index, version: galleryVersion, o
   const thumbSrc = imageUrl(shootingId, image.number, version, 'thumb', info.token);
 
   useEffect(() => setLoaded(false), [previewSrc]);
+
+  // Enregistre la vue quand la photo reste affichée au moins une seconde (pas en faisant défiler vite).
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void api.post(`/api/shootings/${shootingId}/images/${image.number}/${version}/view`).catch(() => {});
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [shootingId, image.number, version]);
 
   const go = useCallback(
     (delta: number) => {
