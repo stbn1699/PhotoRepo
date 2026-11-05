@@ -13,6 +13,7 @@ import { shootingRoutes } from './routes/shootings.js';
 import { galleryRoutes } from './routes/gallery.js';
 import { adminRoutes } from './routes/admin.js';
 import { activityRoutes } from './routes/activity.js';
+import { siteRoutes } from './routes/site.js';
 import { warmCache } from './images.js';
 
 const app = Fastify({
@@ -42,8 +43,8 @@ app.addHook('onRequest', async (request) => {
   if (request.url.startsWith('/api/')) await loadSession(request);
 });
 
-app.get('/api/site', async () => ({ name: config.siteName }));
 
+await app.register(siteRoutes);
 await app.register(authRoutes);
 await app.register(shootingRoutes);
 await app.register(galleryRoutes);

@@ -1,14 +1,15 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from './auth';
+import { Signature } from './components/Signature';
 
 export function Layout({ children }: { children: ReactNode }) {
   const { user, siteName, logout } = useAuth();
   return (
     <div className="layout">
       <header className="topbar">
-        <Link to="/" className="brand">
-          {siteName}
+        <Link to="/" className="brand" aria-label={siteName}>
+          <Signature className="signature-topbar" label={siteName} fallback={siteName} />
         </Link>
         <div className="topbar-right">
           {user?.isAdmin && (

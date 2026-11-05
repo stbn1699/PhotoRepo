@@ -23,6 +23,11 @@ Photographie/
 - Un nouveau dossier est **caché pour tout le monde** sauf l'admin, tant qu'on n'a pas donné l'accès.
 - Le dossier Photographie est monté **en lecture seule** : le site ne modifie jamais les photos.
 
+## Signature et icône
+
+- La signature `copyright.png` à la racine du lecteur Photographie (la même que celle de Lightroom) remplace le nom du site, en haut à gauche et sur la page de connexion. Elle est recolorée aux couleurs du site, sans toucher au fichier. Si tu la changes sur le NAS, le site suit (dans l'heure, à cause du cache). Pour en utiliser une autre : variable `SIGNATURE_FILE`. Sans signature, c'est le nom du site (`SITE_NAME`) qui s'affiche.
+- L'icône (un diaphragme) est dans `web/public/` : onglet du navigateur et « Ajouter à l'écran d'accueil » sur téléphone.
+
 ## Galerie et téléchargements
 
 - La galerie affiche des miniatures (800 px) et la vue en grand un aperçu (2048 px). Les deux sont générés une fois puis gardés dans `data/cache`. Dès qu'un shooting apparaît, le serveur les prépare en arrière-plan.

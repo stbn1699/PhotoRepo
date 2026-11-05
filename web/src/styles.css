@@ -266,7 +266,7 @@ h2 {
 }
 .gallery-toolbar {
   position: sticky;
-  top: 57px;
+  top: 68px;
   z-index: 5;
   display: flex;
   flex-wrap: wrap;
@@ -576,7 +576,7 @@ h2 {
     --row-h: 200px;
   }
   .gallery-toolbar {
-    top: 53px;
+    top: 58px;
   }
   .segmented button {
     padding: 6px 10px;
@@ -1034,5 +1034,54 @@ a.btn {
   }
   .tabs a {
     padding: 6px 10px;
+  }
+}
+
+/* Signature (copyright.png du NAS, recolorée) : remplace le nom du site */
+.signature {
+  display: block;
+  flex-shrink: 0;
+  background-color: var(--accent);
+  -webkit-mask: url('/api/signature') center / contain no-repeat;
+  mask: url('/api/signature') center / contain no-repeat;
+}
+.signature-placeholder {
+  display: block;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+}
+.topbar {
+  height: 68px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.signature-topbar {
+  height: 48px;
+  transition: opacity 0.15s;
+}
+.brand:hover .signature-topbar {
+  opacity: 0.8;
+}
+.signature-placeholder.signature-topbar {
+  width: 110px;
+}
+.login-card h1 {
+  display: flex;
+  justify-content: center;
+  min-height: 72px;
+  align-items: center;
+}
+.signature-login {
+  height: 72px;
+}
+@media (max-width: 600px) {
+  .topbar {
+    height: 58px;
+  }
+  .signature-topbar {
+    height: 38px;
   }
 }

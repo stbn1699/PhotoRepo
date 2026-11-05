@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
+import { Signature } from '../components/Signature';
 
 export function LoginPage() {
   const { user, loading, siteName, login } = useAuth();
@@ -33,7 +34,9 @@ export function LoginPage() {
   return (
     <div className="login-page">
       <form className="login-card" onSubmit={onSubmit}>
-        <h1>{siteName}</h1>
+        <h1>
+          <Signature className="signature-login" label={siteName} fallback={siteName} />
+        </h1>
         <p className="muted">Connecte-toi pour voir tes photos.</p>
         <label>
           Pseudo
