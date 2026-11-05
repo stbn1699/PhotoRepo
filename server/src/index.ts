@@ -11,6 +11,7 @@ import { scanLibrary } from './library.js';
 import { authRoutes } from './routes/auth.js';
 import { shootingRoutes } from './routes/shootings.js';
 import { galleryRoutes } from './routes/gallery.js';
+import { adminRoutes } from './routes/admin.js';
 import { warmCache } from './images.js';
 
 const app = Fastify({
@@ -27,6 +28,14 @@ await app.register(rateLimit, {
   }),
 });
 
+// Données envoyées invalides : message en français (le site vérifie déjà les champs avant l'envoi).
+app.setErrorHandler((error: { validation?: unknown; statusCode?: number }, request, reply) => {
+  if (error.validation) return reply.code(400).send({ error: 'Données invalides' });
+  if (error.statusCode === 429) return reply.code(429).send(error);
+  request.log.error(error);
+  return reply.code(error.statusCode && error.statusCode < 500 ? error.statusCode : 500).send({ error: 'Erreur du serveur' });
+});
+
 app.decorateRequest('user', null);
 app.addHook('onRequest', async (request) => {
   if (request.url.startsWith('/api/')) await loadSession(request);
@@ -37,6 +46,7 @@ app.get('/api/site', async () => ({ name: config.siteName }));
 await app.register(authRoutes);
 await app.register(shootingRoutes);
 await app.register(galleryRoutes);
+await app.register(adminRoutes);
 
 // En production, le même serveur sert le site React compilé.
 if (config.webDist && fs.existsSync(config.webDist)) {

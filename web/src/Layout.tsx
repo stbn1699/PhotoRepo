@@ -11,6 +11,11 @@ export function Layout({ children }: { children: ReactNode }) {
           {siteName}
         </Link>
         <div className="topbar-right">
+          {user?.isAdmin && (
+            <Link to="/admin" className="btn btn-ghost">
+              Admin
+            </Link>
+          )}
           <span className="whoami">
             {user?.displayName || user?.username}
             {user?.isAdmin && <span className="badge">admin</span>}

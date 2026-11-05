@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { useAuth } from '../auth';
 import {
   api,
   formatShootingDate,
@@ -17,6 +18,7 @@ import { canShareFiles, triggerDownload, type DownloadItem } from '../downloads'
 
 export function ShootingPage() {
   const id = Number(useParams().id);
+  const { user } = useAuth();
   const [data, setData] = useState<ShootingDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState<Version>('original');
@@ -104,6 +106,11 @@ export function ShootingPage() {
             {formatShootingDate(data.shooting)} · {data.images.length} photo{data.images.length > 1 ? 's' : ''}
           </p>
         </div>
+        {user?.isAdmin && (
+          <Link to={`/admin/shootings?open=${id}`} className="btn btn-ghost">
+            Gérer l’accès
+          </Link>
+        )}
       </div>
 
       {data.duplicates && data.duplicates.length > 0 && (

@@ -22,6 +22,9 @@ async function request<T>(method: string, url: string, body?: unknown): Promise<
 export const api = {
   get: <T>(url: string) => request<T>('GET', url),
   post: <T>(url: string, body?: unknown) => request<T>('POST', url, body ?? {}),
+  put: <T>(url: string, body: unknown) => request<T>('PUT', url, body),
+  patch: <T>(url: string, body: unknown) => request<T>('PATCH', url, body),
+  del: <T>(url: string) => request<T>('DELETE', url),
 };
 
 export interface User {
@@ -82,4 +85,28 @@ export function imageUrl(
 
 export function originalUrl(shootingId: number, number: number, version: Version, batch = false): string {
   return `/api/shootings/${shootingId}/images/${number}/${version}/original?download=1${batch ? '&batch=1' : ''}`;
+}
+
+export interface AdminUser {
+  id: number;
+  username: string;
+  displayName: string | null;
+  isAdmin: boolean;
+  disabled: boolean;
+  createdAt: string;
+  lastLoginAt: string | null;
+  shootingIds: number[];
+}
+
+export interface AdminShooting extends Shooting {
+  userIds: number[];
+}
+
+export function userLabel(u: Pick<AdminUser, 'username' | 'displayName'>): string {
+  return u.displayName || u.username;
+}
+
+export function formatDateTime(iso: string | null): string {
+  if (!iso) return 'jamais';
+  return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' });
 }
