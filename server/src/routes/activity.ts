@@ -5,6 +5,7 @@ import { pool } from '../db.js';
 const EVENT_GROUPS = {
   views: ['view_shooting', 'view_image'],
   downloads: ['download_image', 'download_zip'],
+  likes: ['like_image'],
   logins: ['login', 'login_failed', 'logout'],
 } as const;
 type EventGroup = keyof typeof EVENT_GROUPS;
@@ -38,6 +39,7 @@ export async function activityRoutes(app: FastifyInstance): Promise<void> {
                 count(*) FILTER (WHERE e.type = 'view_shooting')::int AS visits,
                 count(DISTINCT e.image_number) FILTER (WHERE e.type = 'view_image')::int AS viewed,
                 count(DISTINCT e.image_number) FILTER (WHERE e.type = 'download_image')::int AS downloaded,
+                (SELECT count(*) FROM likes l WHERE l.user_id = e.user_id AND l.shooting_id = e.shooting_id)::int AS liked,
                 max(e.created_at) AS "lastAt"
            FROM events e
            JOIN users u ON u.id = e.user_id
@@ -68,7 +70,7 @@ export async function activityRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request, reply) => {
       const { userId, shootingId } = request.query;
-      const [user, shooting, images, visits] = await Promise.all([
+      const [user, shooting, images, visits, likes] = await Promise.all([
         pool.query('SELECT id, username, display_name AS "displayName" FROM users WHERE id = $1', [userId]),
         pool.query('SELECT id, title FROM shootings WHERE id = $1', [shootingId]),
         pool.query(
@@ -85,9 +87,19 @@ export async function activityRoutes(app: FastifyInstance): Promise<void> {
              FROM events WHERE user_id = $1 AND shooting_id = $2 AND type = 'view_shooting'`,
           [userId, shootingId],
         ),
+        pool.query<{ image_number: number }>(
+          'SELECT image_number FROM likes WHERE user_id = $1 AND shooting_id = $2 ORDER BY image_number',
+          [userId, shootingId],
+        ),
       ]);
       if (!user.rows[0] || !shooting.rows[0]) return reply.code(404).send({ error: 'Introuvable' });
-      return { user: user.rows[0], shooting: shooting.rows[0], images: images.rows, visits: visits.rows[0] };
+      return {
+        user: user.rows[0],
+        shooting: shooting.rows[0],
+        images: images.rows,
+        visits: visits.rows[0],
+        likes: likes.rows.map((r) => r.image_number),
+      };
     },
   );
 

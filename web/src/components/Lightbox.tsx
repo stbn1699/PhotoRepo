@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, imageUrl, isDownloadable, VERSION_LABELS, VERSIONS, type GalleryImage, type Version } from '../api';
+import { Heart } from './Heart';
 
 interface Props {
   shootingId: number;
@@ -9,6 +10,12 @@ interface Props {
   onIndexChange: (index: number) => void;
   onClose: () => void;
   onDownload: (image: GalleryImage, version: Version) => void;
+  /** La photo est-elle dans mes favoris ? */
+  liked: (number: number) => boolean;
+  /** Absent pour l'admin (il voit les likes des modèles, il n'aime pas lui-même). */
+  onToggleLike?: (number: number) => void;
+  /** Admin : numéro → prénoms des modèles qui ont aimé. */
+  likedBy?: Record<string, string[]>;
 }
 
 function firstVersion(image: GalleryImage): Version {
@@ -16,7 +23,18 @@ function firstVersion(image: GalleryImage): Version {
 }
 
 /** Vue en grand d'une photo : navigation, choix de la version, téléchargement. */
-export function Lightbox({ shootingId, images, index, version: galleryVersion, onIndexChange, onClose, onDownload }: Props) {
+export function Lightbox({
+  shootingId,
+  images,
+  index,
+  version: galleryVersion,
+  onIndexChange,
+  onClose,
+  onDownload,
+  liked,
+  onToggleLike,
+  likedBy,
+}: Props) {
   const image = images[index];
   const [chosenVersion, setChosenVersion] = useState<Version>(galleryVersion);
   // Si la photo n'existe pas dans la version choisie, on montre l'originale (ou, à défaut, le RAW).
@@ -29,6 +47,16 @@ export function Lightbox({ shootingId, images, index, version: galleryVersion, o
   const thumbSrc = imageUrl(shootingId, image.number, version, 'thumb', info.token);
 
   useEffect(() => setLoaded(false), [previewSrc]);
+
+  // Double-tap / double-clic sur la photo : l'ajoute aux favoris (avec un cœur qui apparaît).
+  const isLiked = liked(image.number);
+  const [burst, setBurst] = useState(0);
+  function likeFromDoubleTap() {
+    if (!onToggleLike) return;
+    if (!isLiked) onToggleLike(image.number);
+    setBurst((b) => b + 1);
+  }
+  const lastTap = useRef(0);
 
   // Enregistre la vue quand la photo reste affichée au moins une seconde (pas en faisant défiler vite).
   useEffect(() => {
@@ -90,6 +118,14 @@ export function Lightbox({ shootingId, images, index, version: galleryVersion, o
     if (!start) return;
     const dx = e.changedTouches[0].clientX - start.x;
     const dy = e.changedTouches[0].clientY - start.y;
+    if (Math.abs(dx) < 10 && Math.abs(dy) < 10 && (e.target as HTMLElement).closest('.lightbox-image')) {
+      const now = Date.now();
+      if (now - lastTap.current < 300) {
+        lastTap.current = 0;
+        likeFromDoubleTap();
+      } else lastTap.current = now;
+      return;
+    }
     if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) go(dx < 0 ? 1 : -1);
     else if (dy > 100 && Math.abs(dy) > Math.abs(dx) * 1.5) onClose();
   }
@@ -126,6 +162,7 @@ export function Lightbox({ shootingId, images, index, version: galleryVersion, o
         <div
           className={`lightbox-image ${isRaw ? 'protected' : ''}`}
           onContextMenu={isRaw ? (e) => e.preventDefault() : undefined}
+          onDoubleClick={likeFromDoubleTap}
           style={{
             aspectRatio: `${info.width} / ${info.height}`,
             // Aussi grande que possible sans dépasser ni en largeur ni en hauteur.
@@ -144,6 +181,11 @@ export function Lightbox({ shootingId, images, index, version: galleryVersion, o
           />
           {/* RAW : un calque transparent par-dessus empêche « Enregistrer l'image » (clic droit, appui long). */}
           {isRaw && <div className="protect-layer" aria-hidden />}
+          {burst > 0 && (
+            <span key={burst} className="like-burst" aria-hidden>
+              <Heart filled />
+            </span>
+          )}
         </div>
         {index < images.length - 1 && (
           <button className="nav-btn nav-next" onClick={() => go(1)} aria-label="Photo suivante">
@@ -153,6 +195,19 @@ export function Lightbox({ shootingId, images, index, version: galleryVersion, o
       </div>
 
       <div className="lightbox-bottom">
+        {onToggleLike ? (
+          <button
+            className={`btn btn-ghost btn-like ${isLiked ? 'is-liked' : ''}`}
+            onClick={() => onToggleLike(image.number)}
+            aria-pressed={isLiked}
+          >
+            <Heart filled={isLiked} /> {isLiked ? 'Dans mes favoris' : 'J’aime'}
+          </button>
+        ) : (
+          likedBy?.[image.number]?.length ? (
+            <span className="like-badge-inline">♥ {likedBy[image.number].join(', ')}</span>
+          ) : null
+        )}
         {isDownloadable(version) ? (
           <button className="btn btn-primary" onClick={() => onDownload(image, version)}>
             Télécharger

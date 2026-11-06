@@ -1237,3 +1237,138 @@ a.btn {
   inset: 0;
   z-index: 2;
 }
+
+/* Likes */
+.tile-open {
+  all: unset;
+  display: block;
+  width: 100%;
+  cursor: pointer;
+}
+.tile-open:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.like-btn {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  z-index: 3;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, transform 0.15s, color 0.15s;
+}
+.tile:hover .like-btn,
+.like-btn:focus-visible,
+.like-btn.is-liked {
+  opacity: 1;
+}
+.like-btn:active {
+  transform: scale(0.88);
+}
+.like-btn.is-liked {
+  color: #ff5a6e;
+}
+/* Sur téléphone (pas de survol) les cœurs sont toujours visibles, discrets */
+@media (hover: none) {
+  .like-btn {
+    opacity: 0.85;
+    width: 30px;
+    height: 30px;
+  }
+}
+.like-badge {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  z-index: 3;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 99px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #ff8a98;
+  pointer-events: auto;
+}
+.btn-fav.is-active {
+  background: rgba(255, 90, 110, 0.14);
+  border-color: rgba(255, 90, 110, 0.5);
+  color: #ff8a98;
+}
+.btn-like {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.btn-like.is-liked {
+  color: #ff5a6e;
+  border-color: rgba(255, 90, 110, 0.5);
+}
+.like-badge-inline {
+  color: #ff8a98;
+  font-size: 0.9rem;
+}
+.lightbox-bottom {
+  gap: 12px;
+}
+.like-burst {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  color: #ff5a6e;
+  pointer-events: none;
+  animation: like-burst 0.8s ease-out forwards;
+}
+.like-burst svg {
+  width: 96px;
+  height: 96px;
+  filter: drop-shadow(0 4px 16px rgba(0, 0, 0, 0.5));
+}
+@keyframes like-burst {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  20% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+  40% {
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .like-burst {
+    animation-duration: 0.01s;
+  }
+}
+.liked-count {
+  color: #ff8a98;
+  font-weight: 600;
+}
+.tag-like {
+  background: rgba(255, 90, 110, 0.18);
+  color: #ff8a98;
+  font-weight: 700;
+}
+.activity-tile-info {
+  flex-wrap: wrap;
+}
+.type-like_image .journal-icon {
+  background: rgba(255, 90, 110, 0.14);
+  color: #ff8a98;
+}

@@ -25,6 +25,7 @@ const PERIODS = [
 
 const JOURNAL_GROUPS = [
   { value: '', label: 'Tout' },
+  { value: 'likes', label: 'Favoris' },
   { value: 'downloads', label: 'Téléchargements' },
   { value: 'views', label: 'Consultations' },
   { value: 'logins', label: 'Connexions' },
@@ -109,12 +110,13 @@ export function ActivityPage() {
   }, [loadEvents]);
 
   const totals = useMemo(() => {
-    const t = { people: new Set<number>(), visits: 0, viewed: 0, downloaded: 0 };
+    const t = { people: new Set<number>(), visits: 0, viewed: 0, downloaded: 0, liked: 0 };
     for (const r of summary ?? []) {
       t.people.add(r.userId);
       t.visits += r.visits;
       t.viewed += r.viewed;
       t.downloaded += r.downloaded;
+      t.liked += r.liked;
     }
     return t;
   }, [summary]);
@@ -168,6 +170,7 @@ export function ActivityPage() {
               <Stat value={totals.people.size} label={totals.people.size > 1 ? 'personnes' : 'personne'} />
               <Stat value={totals.visits} label={totals.visits > 1 ? 'visites de galerie' : 'visite de galerie'} />
               <Stat value={totals.viewed} label="photos vues en grand" />
+              <Stat value={totals.liked} label="photos aimées" />
               <Stat value={totals.downloaded} label="photos téléchargées" />
             </div>
             <div className="table-wrap">
@@ -178,6 +181,7 @@ export function ActivityPage() {
                     <th>Shooting</th>
                     <th className="num">Visites</th>
                     <th className="num">Vues</th>
+                    <th className="num">Aimées</th>
                     <th className="num">Téléchargées</th>
                     <th>Dernière activité</th>
                     <th aria-label="Détail" />
@@ -192,6 +196,7 @@ export function ActivityPage() {
                       <td className="num">
                         {r.viewed} / {r.imageCount}
                       </td>
+                      <td className="num">{r.liked > 0 ? <span className="liked-count">♥ {r.liked}</span> : '0'}</td>
                       <td className="num">
                         <strong>{r.downloaded}</strong> / {r.imageCount}
                         <div className="muted small">{percent(r.downloaded, r.imageCount)}</div>
@@ -262,7 +267,7 @@ interface EventGroup {
 }
 
 const GROUP_WINDOW_MS = 15 * 60 * 1000;
-const GROUPABLE = new Set(['view_image', 'download_image', 'view_shooting', 'login_failed']);
+const GROUPABLE = new Set(['view_image', 'download_image', 'like_image', 'view_shooting', 'login_failed']);
 
 function groupEvents(events: ActivityEvent[]): EventGroup[] {
   const groups: EventGroup[] = [];
@@ -332,6 +337,14 @@ function Journal({ events }: { events: ActivityEvent[] }) {
               </>
             );
             break;
+          case 'like_image':
+            icon = '♥';
+            text = (
+              <>
+                {who} a aimé {n} photo{n > 1 ? 's' : ''} de {where}
+              </>
+            );
+            break;
           case 'view_image':
             icon = '👁';
             text = (
@@ -372,7 +385,7 @@ function Journal({ events }: { events: ActivityEvent[] }) {
               </>
             );
         }
-        const showImages = g.type === 'download_image' || g.type === 'view_image';
+        const showImages = g.type === 'download_image' || g.type === 'view_image' || g.type === 'like_image';
         return (
           <li key={g.key} className={`journal-item type-${g.type}`}>
             <span className="journal-icon" aria-hidden>
@@ -396,7 +409,7 @@ function Journal({ events }: { events: ActivityEvent[] }) {
 // Détail : une personne × un shooting, photo par photo
 // ---------------------------------------------------------------------------
 
-type DetailFilter = 'all' | 'viewed' | 'downloaded' | 'untouched';
+type DetailFilter = 'all' | 'liked' | 'viewed' | 'downloaded' | 'untouched';
 
 export function ActivityDetailPage() {
   const { userId, shootingId } = useParams();
@@ -441,15 +454,17 @@ export function ActivityDetailPage() {
   if (!detail) return <p className="muted">Chargement…</p>;
 
   const images = gallery?.images ?? [];
+  const likedSet = new Set(detail.likes);
   const total = images.length;
   const viewedCount = images.filter((i) => byNumber.get(i.number)?.viewed.size).length;
   const downloadedCount = images.filter((i) => byNumber.get(i.number)?.downloaded.size).length;
 
   const visible = images.filter((img) => {
     const a = byNumber.get(img.number);
+    if (filter === 'liked') return likedSet.has(img.number);
     if (filter === 'viewed') return !!a?.viewed.size;
     if (filter === 'downloaded') return !!a?.downloaded.size;
-    if (filter === 'untouched') return !a;
+    if (filter === 'untouched') return !a && !likedSet.has(img.number);
     return true;
   });
 
@@ -476,6 +491,7 @@ export function ActivityDetailPage() {
       </div>
 
       <div className="stats">
+        <Stat value={likedSet.size} label="aimées ♥" />
         <Stat value={viewedCount} label={`/ ${total} vues en grand`} />
         <Stat value={downloadedCount} label={`/ ${total} téléchargées`} />
       </div>
@@ -488,9 +504,10 @@ export function ActivityDetailPage() {
             {(
               [
                 ['all', `Toutes (${total})`],
+                ['liked', `Aimées (${likedSet.size})`],
                 ['downloaded', `Téléchargées (${downloadedCount})`],
                 ['viewed', `Vues (${viewedCount})`],
-                ['untouched', `Jamais ouvertes (${total - images.filter((i) => byNumber.has(i.number)).length})`],
+                ['untouched', `Jamais ouvertes (${images.filter((i) => !byNumber.has(i.number) && !likedSet.has(i.number)).length})`],
               ] as [DetailFilter, string][]
             ).map(([value, label]) => (
               <button key={value} className={filter === value ? 'active' : ''} onClick={() => setFilter(value)}>
@@ -510,6 +527,7 @@ export function ActivityDetailPage() {
                   <img src={imageUrl(detail.shooting.id, img.number, thumbVersion, 'thumb', info.token)} alt="" loading="lazy" />
                   <div className="activity-tile-info">
                     <span className="muted small">n° {img.number}</span>
+                    {likedSet.has(img.number) && <span className="tag tag-like">♥</span>}
                     {a?.downloaded.size ? (
                       <span className="tag tag-download" title={`Dernière activité : ${formatDateTime(a.lastAt)}`}>
                         ⬇ {[...a.downloaded.keys()].map((v) => VERSION_LABELS[v]).join(', ')}

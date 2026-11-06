@@ -71,6 +71,17 @@ const migrations: string[] = [
     ADD COLUMN raws_shared boolean NOT NULL DEFAULT false,
     ADD COLUMN raw_count integer NOT NULL DEFAULT 0;
   `,
+  // 3 : likes (favoris des modèles), un par photo (numéro), toutes versions confondues
+  `
+  CREATE TABLE likes (
+    user_id      integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    shooting_id  integer NOT NULL REFERENCES shootings(id) ON DELETE CASCADE,
+    image_number integer NOT NULL,
+    created_at   timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (user_id, shooting_id, image_number)
+  );
+  CREATE INDEX likes_shooting_idx ON likes (shooting_id, image_number);
+  `,
 ];
 
 /** Attend que la base réponde (au démarrage du NAS, Postgres peut être plus lent que le site). */
@@ -118,6 +129,7 @@ export type EventType =
   | 'view_shooting'
   | 'view_image'
   | 'download_image'
+  | 'like_image'
   | 'download_zip';
 
 export async function logEvent(event: {

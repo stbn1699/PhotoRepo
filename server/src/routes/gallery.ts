@@ -88,6 +88,24 @@ export async function galleryRoutes(app: FastifyInstance): Promise<void> {
           ),
         }));
 
+      // Likes : les miens, et pour l'admin ceux des modèles (photo → prénoms).
+      const myLikes = await pool.query<{ image_number: number }>(
+        'SELECT image_number FROM likes WHERE user_id = $1 AND shooting_id = $2',
+        [user.id, shooting.id],
+      );
+      let likedBy: Record<number, string[]> | undefined;
+      if (user.isAdmin) {
+        const { rows } = await pool.query<{ image_number: number; name: string }>(
+          `SELECT l.image_number, COALESCE(u.display_name, u.username) AS name
+             FROM likes l JOIN users u ON u.id = l.user_id
+            WHERE l.shooting_id = $1 AND NOT u.is_admin
+            ORDER BY l.created_at`,
+          [shooting.id],
+        );
+        likedBy = {};
+        for (const r of rows) (likedBy[r.image_number] ??= []).push(r.name);
+      }
+
       await logEvent({ userId: user.id, type: 'view_shooting', shootingId: shooting.id, ip: request.ip });
       return {
         shooting: {
@@ -99,6 +117,8 @@ export async function galleryRoutes(app: FastifyInstance): Promise<void> {
           rawsShared: shooting.raws_shared,
         },
         images,
+        myLikes: myLikes.rows.map((r) => r.image_number),
+        likedBy,
         // Visible uniquement par l'admin : fichiers ignorés car leur numéro était déjà pris.
         duplicates: user.isAdmin ? index.duplicates : undefined,
       };
@@ -207,6 +227,55 @@ export async function galleryRoutes(app: FastifyInstance): Promise<void> {
       }
       await logEvent({ userId: user.id, type: 'view_image', shootingId: shooting.id, imageNumber: number, version, ip: request.ip });
       return { ok: true };
+    },
+  );
+
+  /** Aimer / ne plus aimer une photo (toutes versions confondues : c'est le numéro qui compte). */
+  const likeSchema = {
+    params: {
+      type: 'object',
+      properties: { id: idParam, number: { type: 'integer', minimum: 0, maximum: 2147483647 } },
+      required: ['id', 'number'],
+    },
+  } as const;
+
+  app.put<{ Params: { id: number; number: number } }>(
+    '/api/shootings/:id/images/:number/like',
+    { preHandler: requireUser, schema: likeSchema, config: { rateLimit: { max: 300, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      const user = request.user!;
+      const { id, number } = request.params;
+      const shooting = await findAccessibleShooting(user, id);
+      if (!shooting) return reply.code(404).send({ error: 'Image introuvable' });
+      const versions = (await getShootingIndex(shooting.folder_name)).images.get(number);
+      // La photo doit être visible pour cette personne (un RAW seul ne compte que si les RAW sont partagés).
+      if (!versions || !(versions.original || (versions.raw && canSeeRaws(user, shooting)))) {
+        return reply.code(404).send({ error: 'Image introuvable' });
+      }
+      const { rowCount } = await pool.query(
+        'INSERT INTO likes (user_id, shooting_id, image_number) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
+        [user.id, shooting.id, number],
+      );
+      if (rowCount) {
+        await logEvent({ userId: user.id, type: 'like_image', shootingId: shooting.id, imageNumber: number, ip: request.ip });
+      }
+      return { liked: true };
+    },
+  );
+
+  app.delete<{ Params: { id: number; number: number } }>(
+    '/api/shootings/:id/images/:number/like',
+    { preHandler: requireUser, schema: likeSchema, config: { rateLimit: { max: 300, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      const user = request.user!;
+      const shooting = await findAccessibleShooting(user, request.params.id);
+      if (!shooting) return reply.code(404).send({ error: 'Image introuvable' });
+      await pool.query('DELETE FROM likes WHERE user_id = $1 AND shooting_id = $2 AND image_number = $3', [
+        user.id,
+        shooting.id,
+        request.params.number,
+      ]);
+      return { liked: false };
     },
   );
 

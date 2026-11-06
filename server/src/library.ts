@@ -105,17 +105,59 @@ export interface ShootingIndex {
 }
 
 const INDEX_TTL_MS = 30_000;
-const indexCache = new Map<string, { builtAt: number; index: Promise<ShootingIndex> }>();
+interface CachedIndex {
+  builtAt: number;
+  index: Promise<ShootingIndex>;
+  refreshing?: Promise<ShootingIndex>;
+}
+const indexCache = new Map<string, CachedIndex>();
 
-/** Index d'un dossier de shooting (gardé 30 s en mémoire pour ne pas relire le disque à chaque requête). */
+/**
+ * Index d'un dossier de shooting, gardé en mémoire. Au-delà de 30 s, on répond quand même tout
+ * de suite avec l'index connu et on le relit en arrière-plan : personne n'attend la relecture.
+ * `fresh` (relecture des dossiers) force une relecture complète et l'attend.
+ */
 export function getShootingIndex(folderName: string, { fresh = false } = {}): Promise<ShootingIndex> {
   const cached = indexCache.get(folderName);
-  if (!fresh && cached && Date.now() - cached.builtAt < INDEX_TTL_MS) return cached.index;
+  if (cached && !fresh) {
+    if (Date.now() - cached.builtAt >= INDEX_TTL_MS && !cached.refreshing) {
+      const refreshing = buildIndex(folderName);
+      cached.refreshing = refreshing;
+      refreshing
+        .then(() => indexCache.set(folderName, { builtAt: Date.now(), index: refreshing }))
+        .catch(() => {
+          cached.refreshing = undefined; // on garde l'ancien index, nouvel essai plus tard
+        });
+    }
+    return cached.index;
+  }
+  if (cached?.refreshing && fresh) return cached.refreshing;
   const index = buildIndex(folderName);
-  indexCache.set(folderName, { builtAt: Date.now(), index });
-  index.catch(() => indexCache.delete(folderName));
+  index
+    .then(() => indexCache.set(folderName, { builtAt: Date.now(), index }))
+    .catch(() => {
+      if (indexCache.get(folderName)?.index === index) indexCache.delete(folderName);
+    });
+  if (!cached) indexCache.set(folderName, { builtAt: Date.now(), index });
   return index;
 }
+
+/** Exécute `fn` sur chaque élément, au plus `limit` à la fois, en gardant l'ordre des résultats. */
+async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
+// Lectures de fichiers en parallèle (utile surtout si les photos sont sur un partage réseau).
+const IO_CONCURRENCY = 16;
 
 async function buildIndex(folderName: string): Promise<ShootingIndex> {
   const shootingDir = path.join(config.photosRoot, folderName);
@@ -141,19 +183,26 @@ async function buildIndex(folderName: string): Promise<ShootingIndex> {
       .filter((e) => e.isFile())
       .map((e) => e.name)
       .sort((a, b) => a.localeCompare(b, 'fr', { numeric: true }));
+    // D'abord le tri (premier fichier gardé pour chaque numéro), puis les lectures en parallèle.
+    const kept: { number: number; name: string }[] = [];
+    const seen = new Set<number>();
     for (const name of names) {
       const number = parseImageNumber(name);
       if (number === null) continue;
-      if (files.has(number)) {
+      if (seen.has(number)) {
         duplicates.push(path.relative(shootingDir, path.join(dir, name)));
         continue;
       }
+      seen.add(number);
+      kept.push({ number, name });
+    }
+    const read = await mapLimit(kept, IO_CONCURRENCY, async ({ number, name }) => {
       const filePath = path.join(dir, name);
       const stat = await fs.stat(filePath);
       const size = await getImageSize(filePath, stat.size, stat.mtimeMs);
-      if (!size) continue; // fichier illisible
-      files.set(number, { path: filePath, name, size: stat.size, mtimeMs: stat.mtimeMs, ...size });
-    }
+      return size ? { number, file: { path: filePath, name, size: stat.size, mtimeMs: stat.mtimeMs, ...size } } : null;
+    });
+    for (const r of read) if (r) files.set(r.number, r.file); // les fichiers illisibles sont ignorés
     byVersion.set(version, files);
   }
 
@@ -169,18 +218,24 @@ async function buildIndex(folderName: string): Promise<ShootingIndex> {
       .filter((e) => e.isFile())
       .map((e) => e.name)
       .sort((a, b) => a.localeCompare(b, 'fr', { numeric: true }));
+    const kept: { number: number; name: string }[] = [];
+    const seen = new Set<number>();
     for (const name of names) {
       const number = parseImageNumber(name, RAW_EXTENSIONS);
       if (number === null) continue;
-      if (raws.has(number)) {
+      if (seen.has(number)) {
         duplicates.push(path.join(path.basename(path.dirname(rawDir)), path.basename(rawDir), name));
         continue;
       }
+      seen.add(number);
+      kept.push({ number, name });
+    }
+    const read = await mapLimit(kept, IO_CONCURRENCY, async ({ number, name }) => {
       const filePath = path.join(rawDir, name);
       const stat = await fs.stat(filePath);
       const info = await getRawInfo(filePath, stat.size, stat.mtimeMs);
-      if (!info) continue; // format non reconnu
-      raws.set(number, {
+      if (!info) return null; // format non reconnu
+      const file: ImageFile = {
         path: filePath,
         name,
         size: stat.size,
@@ -188,8 +243,10 @@ async function buildIndex(folderName: string): Promise<ShootingIndex> {
         width: info.width,
         height: info.height,
         raw: { offset: info.offset, length: info.length, rotate: info.rotate },
-      });
-    }
+      };
+      return { number, file };
+    });
+    for (const r of read) if (r) raws.set(r.number, r.file);
     byVersion.set('raw', raws);
   }
 

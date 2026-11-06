@@ -72,6 +72,10 @@ export interface GalleryImage {
 export interface ShootingDetail {
   shooting: Shooting & { rawsShared: boolean };
   images: GalleryImage[];
+  /** Numéros des photos que j'ai aimées. */
+  myLikes: number[];
+  /** Admin seulement : numéro → prénoms des modèles qui l'ont aimée. */
+  likedBy?: Record<string, string[]>;
   duplicates?: string[];
 }
 
@@ -125,6 +129,7 @@ export interface ActivitySummaryRow {
   visits: number;
   viewed: number;
   downloaded: number;
+  liked: number;
   lastAt: string;
 }
 
@@ -135,7 +140,8 @@ export type ActivityEventType =
   | 'view_shooting'
   | 'view_image'
   | 'download_image'
-  | 'download_zip';
+  | 'download_zip'
+  | 'like_image';
 
 export interface ActivityEvent {
   id: number;
@@ -157,4 +163,5 @@ export interface ActivityDetail {
   shooting: { id: number; title: string };
   images: { number: number; version: Version; type: 'view_image' | 'download_image'; count: number; firstAt: string; lastAt: string }[];
   visits: { count: number; firstAt: string | null; lastAt: string | null };
+  likes: number[];
 }

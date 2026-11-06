@@ -16,6 +16,7 @@ import {
 import { DownloadDialog } from '../components/DownloadDialog';
 import { Lightbox } from '../components/Lightbox';
 import { FadeImage } from '../components/FadeImage';
+import { Heart } from '../components/Heart';
 import { canShareFiles, triggerDownload, type DownloadItem } from '../downloads';
 
 export function ShootingPage() {
@@ -28,18 +29,54 @@ export function ShootingPage() {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const [downloadItems, setDownloadItems] = useState<DownloadItem[] | null>(null);
+  const [likes, setLikes] = useState<Set<number>>(new Set());
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
 
   useEffect(() => {
     setData(null);
     setError(null);
     api
       .get<ShootingDetail>(`/api/shootings/${id}`)
-      .then(setData)
+      .then((d) => {
+        setData(d);
+        setLikes(new Set(d.myLikes));
+      })
       .catch((err) => setError(err.message));
   }, [id]);
 
-  // Images visibles : celles qui existent dans la version choisie.
-  const images = useMemo(() => data?.images.filter((i) => i.versions[version]) ?? [], [data, version]);
+  // L'admin voit les likes des modèles (badges), les modèles aiment elles-mêmes (cœurs).
+  const isAdmin = !!user?.isAdmin;
+  const likedBy = data?.likedBy ?? {};
+  const isFavorite = useCallback(
+    (n: number) => (isAdmin ? (likedBy[n]?.length ?? 0) > 0 : likes.has(n)),
+    [isAdmin, likedBy, likes],
+  );
+
+  // Images visibles : celles qui existent dans la version choisie (et aimées, si le filtre est actif).
+  const versionImages = useMemo(() => data?.images.filter((i) => i.versions[version]) ?? [], [data, version]);
+  const favoriteCount = versionImages.filter((i) => isFavorite(i.number)).length;
+  const images = useMemo(
+    () => (favoritesOnly ? versionImages.filter((i) => isFavorite(i.number)) : versionImages),
+    [versionImages, favoritesOnly, isFavorite],
+  );
+
+  async function toggleLike(number: number) {
+    const liked = likes.has(number);
+    const apply = (on: boolean) =>
+      setLikes((prev) => {
+        const next = new Set(prev);
+        if (on) next.add(number);
+        else next.delete(number);
+        return next;
+      });
+    apply(!liked); // tout de suite à l'écran, annulé si le serveur refuse
+    try {
+      if (liked) await api.del(`/api/shootings/${id}/images/${number}/like`);
+      else await api.put(`/api/shootings/${id}/images/${number}/like`, {});
+    } catch {
+      apply(liked);
+    }
+  }
   const counts = useMemo(() => {
     const c = { original: 0, carre: 0, story: 0, raw: 0 } as Record<Version, number>;
     for (const img of data?.images ?? []) for (const v of VERSIONS) if (img.versions[v]) c[v]++;
@@ -57,6 +94,7 @@ export function ShootingPage() {
   function changeVersion(v: Version) {
     setVersion(v);
     setSelected(new Set());
+    setOpenIndex(null);
     if (!isDownloadable(v)) setSelecting(false);
   }
 
@@ -187,6 +225,16 @@ export function ShootingPage() {
           ))}
         </div>
         <div className="toolbar-actions">
+          {(favoriteCount > 0 || favoritesOnly) && (
+            <button
+              className={`btn btn-ghost btn-fav ${favoritesOnly ? 'is-active' : ''}`}
+              onClick={() => setFavoritesOnly(!favoritesOnly)}
+              aria-pressed={favoritesOnly}
+              title={isAdmin ? 'Afficher seulement les photos aimées par les modèles' : 'Afficher seulement mes favoris'}
+            >
+              ♥ {isAdmin ? 'Aimées' : 'Mes favoris'} ({favoriteCount})
+            </button>
+          )}
           {isRaw ? (
             <span className="raw-note">🔒 Aperçus protégés · les RAW ne se téléchargent pas</span>
           ) : selecting ? (
@@ -216,26 +264,48 @@ export function ShootingPage() {
           const info = img.versions[version]!;
           const ratio = info.width / info.height;
           const isSelected = selected.has(img.number);
+          const liked = likes.has(img.number);
+          const fans = likedBy[img.number] ?? [];
           return (
-            <button
+            <div
               key={img.number}
               className={`tile ${selecting ? 'is-selecting' : ''} ${isSelected ? 'is-selected' : ''} ${isRaw ? 'protected' : ''}`}
               onContextMenu={isRaw ? (e) => e.preventDefault() : undefined}
               style={{ flexGrow: ratio, flexBasis: `calc(var(--row-h) * ${ratio})` }}
-              onClick={() => (selecting ? toggle(img.number) : setOpenIndex(i))}
-              aria-pressed={selecting ? isSelected : undefined}
-              aria-label={`Photo ${img.number}`}
             >
-              <FadeImage
-                src={imageUrl(id, img.number, version, 'thumb', info.token)}
-                alt=""
-                loading="lazy"
-                decoding="async"
-                style={{ aspectRatio: `${info.width} / ${info.height}` }}
-                draggable={!isRaw}
-              />
+              <button
+                className="tile-open"
+                onClick={() => (selecting ? toggle(img.number) : setOpenIndex(i))}
+                aria-pressed={selecting ? isSelected : undefined}
+                aria-label={`Photo ${img.number}`}
+              >
+                <FadeImage
+                  src={imageUrl(id, img.number, version, 'thumb', info.token)}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                  style={{ aspectRatio: `${info.width} / ${info.height}` }}
+                  draggable={!isRaw}
+                />
+              </button>
               {selecting && <span className="check" aria-hidden />}
-            </button>
+              {isAdmin ? (
+                fans.length > 0 && (
+                  <span className="like-badge" title={`Aimée par ${fans.join(', ')}`}>
+                    ♥ {fans.length}
+                  </span>
+                )
+              ) : (
+                <button
+                  className={`like-btn ${liked ? 'is-liked' : ''}`}
+                  onClick={() => toggleLike(img.number)}
+                  aria-pressed={liked}
+                  aria-label={liked ? `Retirer la photo ${img.number} des favoris` : `Ajouter la photo ${img.number} aux favoris`}
+                >
+                  <Heart filled={liked} />
+                </button>
+              )}
+            </div>
           );
         })}
       </div>
@@ -264,6 +334,9 @@ export function ShootingPage() {
           onIndexChange={setOpenIndex}
           onClose={() => setOpenIndex(null)}
           onDownload={downloadOne}
+          liked={(n) => likes.has(n)}
+          onToggleLike={isAdmin ? undefined : toggleLike}
+          likedBy={isAdmin ? likedBy : undefined}
         />
       )}
 

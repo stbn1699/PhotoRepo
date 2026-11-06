@@ -32,6 +32,12 @@ Photographie/
 - **Partage désactivé par défaut**, shooting par shooting : interrupteur « Partager les RAW » dans la galerie (admin) ou dans *Admin → Accès par shooting*. L'admin voit toujours les RAW.
 - **Les RAW ne sont jamais téléchargeables**, même par l'admin : le serveur refuse, il n'y a pas de bouton, et clic droit / appui long / glisser sont bloqués. Les aperçus ne sont pas gardés en cache par le navigateur.
 
+## Favoris (likes)
+
+- Chaque modèle peut aimer des photos : cœur sur les miniatures, bouton « J'aime » ou double-tap dans la vue en grand, et filtre « Mes favoris ».
+- Un like porte sur la photo (son numéro), toutes versions confondues. Aimer un RAW non retouché te signale qu'elle aimerait que tu retouches cette photo.
+- Côté admin : badge ♥ avec les prénoms sur chaque photo aimée, filtre « Aimées », et dans *Suivi* une colonne « Aimées », le filtre « Favoris » du journal et le détail photo par photo.
+
 ## Signature et icône
 
 - La signature `copyright.png` à la racine du lecteur Photographie (la même que celle de Lightroom) remplace le nom du site, en haut à gauche et sur la page de connexion. Elle est recolorée aux couleurs du site, sans toucher au fichier. Si tu la changes sur le NAS, le site suit (dans l'heure, à cause du cache). Pour en utiliser une autre : variable `SIGNATURE_FILE`. Sans signature, c'est le nom du site (`SITE_NAME`) qui s'affiche.
