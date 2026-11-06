@@ -26,7 +26,8 @@ Photographie/
 ## RAW
 
 - Les RAW sont lus dans `Raws/<même nom de dossier que le shooting>/` à la racine du lecteur (nom comparé sans tenir compte des majuscules). Formats : `.NEF` et `.DNG`. Les `.xmp`, `.jpg`, vidéos… sont ignorés.
-- Le numéro est le dernier nombre du nom (`EBA_0012.NEF` → 12). Un RAW n'est affiché que si une originale porte le même numéro.
+- Le numéro est le dernier nombre du nom (`EBA_0012.NEF` → 12) : il relie le RAW à la photo retouchée du même numéro. **Tous les RAW sont affichés**, y compris ceux qui n'ont pas de version retouchée, pour que la modèle puisse repérer des photos que tu n'as pas retenues.
+- Seules les miniatures des RAW des shootings partagés sont préparées à l'avance (il peut y en avoir des centaines). Le reste est généré à la demande.
 - Le site affiche l'aperçu JPEG que l'appareil intègre au fichier (le rendu de l'appareil, sans les retouches Lightroom), réduit à 1600 px et **filigrané avec la signature**.
 - **Partage désactivé par défaut**, shooting par shooting : interrupteur « Partager les RAW » dans la galerie (admin) ou dans *Admin → Accès par shooting*. L'admin voit toujours les RAW.
 - **Les RAW ne sont jamais téléchargeables**, même par l'admin : le serveur refuse, il n'y a pas de bouton, et clic droit / appui long / glisser sont bloqués. Les aperçus ne sont pas gardés en cache par le navigateur.

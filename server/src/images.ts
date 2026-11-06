@@ -134,12 +134,12 @@ export async function warmCache(log: { info: (obj: object, msg: string) => void;
   if (warming) return;
   warming = true;
   try {
-    const { rows } = await pool.query<{ folder_name: string }>(
-      'SELECT folder_name FROM shootings WHERE present ORDER BY shot_date DESC',
+    const { rows } = await pool.query<{ folder_name: string; raws_shared: boolean }>(
+      'SELECT folder_name, raws_shared FROM shootings WHERE present ORDER BY shot_date DESC',
     );
     for (const rendition of ['thumb', 'preview'] as const) {
       let generated = 0;
-      for (const { folder_name } of rows) {
+      for (const { folder_name, raws_shared } of rows) {
         let index;
         try {
           index = await getShootingIndex(folder_name);
@@ -151,6 +151,8 @@ export async function warmCache(log: { info: (obj: object, msg: string) => void;
           for (const v of VERSIONS) {
             const image = versions[v];
             if (!image) continue;
+            // RAW : seulement les miniatures, et seulement si partagés (il peut y en avoir des centaines).
+            if (v === 'raw' && (!raws_shared || rendition !== 'thumb')) continue;
             jobs.push(
               fs.access(cachePath(image, rendition)).catch(() => {
                 generated++;

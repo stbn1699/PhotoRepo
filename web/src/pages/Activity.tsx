@@ -502,10 +502,12 @@ export function ActivityDetailPage() {
           <div className="activity-grid">
             {visible.map((img) => {
               const a = byNumber.get(img.number);
-              const info = img.versions.original!;
+              // Miniature de l'originale, ou du RAW si la photo n'a pas été retouchée.
+              const thumbVersion: Version = img.versions.original ? 'original' : 'raw';
+              const info = img.versions[thumbVersion]!;
               return (
                 <div key={img.number} className={`activity-tile ${a ? '' : 'is-untouched'}`}>
-                  <img src={imageUrl(detail.shooting.id, img.number, 'original', 'thumb', info.token)} alt="" loading="lazy" />
+                  <img src={imageUrl(detail.shooting.id, img.number, thumbVersion, 'thumb', info.token)} alt="" loading="lazy" />
                   <div className="activity-tile-info">
                     <span className="muted small">n° {img.number}</span>
                     {a?.downloaded.size ? (

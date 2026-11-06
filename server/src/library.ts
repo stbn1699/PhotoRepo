@@ -98,7 +98,7 @@ export interface ImageFile {
 export type ImageVersions = Partial<Record<Version, ImageFile>>;
 
 export interface ShootingIndex {
-  /** numéro → versions disponibles (seules les images qui ont une originale sont gardées) */
+  /** numéro → versions disponibles (une image a au moins une originale ou un RAW) */
   images: Map<number, ImageVersions>;
   /** fichiers ignorés car un autre fichier avait déjà le même numéro dans la même version */
   duplicates: string[];
@@ -159,8 +159,9 @@ async function buildIndex(folderName: string): Promise<ShootingIndex> {
 
   const originals = byVersion.get('original')!;
 
-  // RAW : dans Raws/<même nom de dossier>/ à la racine du lecteur. On ne garde que ceux
-  // qui ont une originale du même numéro (les .xmp, .jpg, vidéos… sont ignorés).
+  // RAW : dans Raws/<même nom de dossier>/ à la racine du lecteur. Tous sont gardés, même sans
+  // photo retouchée du même numéro (la modèle peut ainsi repérer des photos non retenues).
+  // Les .xmp, .jpg, vidéos… sont ignorés.
   const rawDir = await findRawDir(folderName);
   if (rawDir) {
     const raws = new Map<number, ImageFile>();
@@ -170,7 +171,7 @@ async function buildIndex(folderName: string): Promise<ShootingIndex> {
       .sort((a, b) => a.localeCompare(b, 'fr', { numeric: true }));
     for (const name of names) {
       const number = parseImageNumber(name, RAW_EXTENSIONS);
-      if (number === null || !originals.has(number)) continue;
+      if (number === null) continue;
       if (raws.has(number)) {
         duplicates.push(path.join(path.basename(path.dirname(rawDir)), path.basename(rawDir), name));
         continue;
@@ -192,8 +193,10 @@ async function buildIndex(folderName: string): Promise<ShootingIndex> {
     byVersion.set('raw', raws);
   }
 
+  // Une image = un numéro qui a une originale et/ou un RAW (carré et story suivent l'originale).
   const images = new Map<number, ImageVersions>();
-  for (const number of [...originals.keys()].sort((a, b) => a - b)) {
+  const numbers = new Set([...originals.keys(), ...(byVersion.get('raw')?.keys() ?? [])]);
+  for (const number of [...numbers].sort((a, b) => a - b)) {
     const versions: ImageVersions = {};
     for (const v of VERSIONS) {
       const file = byVersion.get(v)?.get(number);
@@ -349,7 +352,7 @@ async function doScan(): Promise<ScanResult> {
     let rawCount = 0;
     try {
       const index = await getShootingIndex(entry.name, { fresh: true });
-      imageCount = index.images.size;
+      imageCount = [...index.images.values()].filter((v) => v.original).length;
       rawCount = [...index.images.values()].filter((v) => v.raw).length;
     } catch {
       continue; // dossier illisible

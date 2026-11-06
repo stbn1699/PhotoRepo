@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { hashPassword, requireAdmin } from '../auth.js';
 import { pool } from '../db.js';
+import { warmCache } from '../images.js';
 
 const idParams = {
   type: 'object',
@@ -234,6 +235,8 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
         request.body.rawsShared,
       ]);
       if (!rowCount) return reply.code(404).send({ error: 'Shooting introuvable' });
+      // RAW partagés : on prépare leurs miniatures en arrière-plan.
+      if (request.body.rawsShared) void warmCache(app.log).catch(() => {});
       return { ok: true };
     },
   );

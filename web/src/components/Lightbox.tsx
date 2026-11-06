@@ -11,12 +11,16 @@ interface Props {
   onDownload: (image: GalleryImage, version: Version) => void;
 }
 
+function firstVersion(image: GalleryImage): Version {
+  return VERSIONS.find((v) => image.versions[v]) ?? 'original';
+}
+
 /** Vue en grand d'une photo : navigation, choix de la version, téléchargement. */
 export function Lightbox({ shootingId, images, index, version: galleryVersion, onIndexChange, onClose, onDownload }: Props) {
   const image = images[index];
   const [chosenVersion, setChosenVersion] = useState<Version>(galleryVersion);
-  // Si la photo n'existe pas dans la version choisie, on montre l'originale.
-  const version: Version = image.versions[chosenVersion] ? chosenVersion : 'original';
+  // Si la photo n'existe pas dans la version choisie, on montre l'originale (ou, à défaut, le RAW).
+  const version: Version = image.versions[chosenVersion] ? chosenVersion : firstVersion(image);
   const info = image.versions[version]!;
   const [loaded, setLoaded] = useState(false);
 
@@ -65,7 +69,7 @@ export function Lightbox({ shootingId, images, index, version: galleryVersion, o
   // Précharge les photos voisines pour une navigation fluide.
   useEffect(() => {
     for (const neighbor of [images[index + 1], images[index - 1]]) {
-      const v = neighbor?.versions[version] ? version : 'original';
+      const v = neighbor?.versions[version] ? version : neighbor ? firstVersion(neighbor) : version;
       const n = neighbor?.versions[v];
       if (neighbor && n) new Image().src = imageUrl(shootingId, neighbor.number, v, 'preview', n.token);
     }

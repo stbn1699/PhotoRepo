@@ -46,6 +46,14 @@ export function ShootingPage() {
     return c;
   }, [data]);
 
+  // Si la version affichée n'a aucune photo (ex. shooting avec seulement des RAW), on passe à la première disponible.
+  useEffect(() => {
+    if (data && counts[version] === 0) {
+      const first = VERSIONS.find((v) => counts[v] > 0);
+      if (first) setVersion(first);
+    }
+  }, [data, counts, version]);
+
   function changeVersion(v: Version) {
     setVersion(v);
     setSelected(new Set());
@@ -124,7 +132,8 @@ export function ShootingPage() {
         <div>
           <h1>{data.shooting.title}</h1>
           <p className="muted">
-            {formatShootingDate(data.shooting)} · {data.images.length} photo{data.images.length > 1 ? 's' : ''}
+            {formatShootingDate(data.shooting)} · {counts.original} photo{counts.original > 1 ? 's' : ''}
+            {counts.raw > 0 && ` · ${counts.raw} RAW`}
           </p>
         </div>
         {user?.isAdmin && (

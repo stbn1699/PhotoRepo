@@ -75,15 +75,18 @@ export async function galleryRoutes(app: FastifyInstance): Promise<void> {
 
       const index = await getShootingIndex(shooting.folder_name);
       const showRaws = canSeeRaws(user, shooting);
-      const images = [...index.images.entries()].map(([number, versions]) => ({
-        number,
-        versions: Object.fromEntries(
-          VERSIONS.filter((v) => versions[v] && (v !== 'raw' || showRaws)).map((v) => {
-            const f = versions[v]!;
-            return [v, { width: f.width, height: f.height, size: f.size, name: f.name, token: versionToken(f) }];
-          }),
-        ),
-      }));
+      // Sans partage des RAW, les numéros qui n'ont qu'un RAW n'apparaissent pas du tout.
+      const images = [...index.images.entries()]
+        .filter(([, versions]) => versions.original || showRaws)
+        .map(([number, versions]) => ({
+          number,
+          versions: Object.fromEntries(
+            VERSIONS.filter((v) => versions[v] && (v !== 'raw' || showRaws)).map((v) => {
+              const f = versions[v]!;
+              return [v, { width: f.width, height: f.height, size: f.size, name: f.name, token: versionToken(f) }];
+            }),
+          ),
+        }));
 
       await logEvent({ userId: user.id, type: 'view_shooting', shootingId: shooting.id, ip: request.ip });
       return {
@@ -92,7 +95,7 @@ export async function galleryRoutes(app: FastifyInstance): Promise<void> {
           title: shooting.title,
           date: shooting.date,
           datePrecision: shooting.date_precision,
-          imageCount: images.length,
+          imageCount: images.filter((i) => 'original' in i.versions).length,
           rawsShared: shooting.raws_shared,
         },
         images,
@@ -217,7 +220,7 @@ export async function galleryRoutes(app: FastifyInstance): Promise<void> {
     async (request, reply) => {
       const shooting = await findAccessibleShooting(request.user!, request.params.id);
       if (!shooting) return reply.code(404).send({ error: 'Introuvable' });
-      const first = (await getShootingIndex(shooting.folder_name)).images.values().next().value;
+      const first = [...(await getShootingIndex(shooting.folder_name)).images.values()].find((v) => v.original);
       if (!first?.original) return reply.code(404).send({ error: 'Aucune image' });
       const file = await getRendition(first.original, 'thumb');
       const stat = await fs.promises.stat(file);
