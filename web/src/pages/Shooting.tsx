@@ -98,20 +98,6 @@ export function ShootingPage() {
     if (!isDownloadable(v)) setSelecting(false);
   }
 
-  const [savingRaws, setSavingRaws] = useState(false);
-  async function toggleRawsShared(shared: boolean) {
-    if (!data) return;
-    setSavingRaws(true);
-    try {
-      await api.patch(`/api/admin/shootings/${id}`, { rawsShared: shared });
-      setData({ ...data, shooting: { ...data.shooting, rawsShared: shared } });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur');
-    } finally {
-      setSavingRaws(false);
-    }
-  }
-
   const toItem = useCallback(
     (img: GalleryImage, v: Version, batch: boolean): DownloadItem => {
       const info = img.versions[v]!;
@@ -176,18 +162,6 @@ export function ShootingPage() {
         </div>
         {user?.isAdmin && (
           <div className="gallery-admin">
-            {counts.raw > 0 && (
-              <label className="switch" title="Les modèles qui ont accès à ce shooting pourront voir les RAW (jamais les télécharger)">
-                <input
-                  type="checkbox"
-                  checked={data.shooting.rawsShared}
-                  disabled={savingRaws}
-                  onChange={(e) => toggleRawsShared(e.target.checked)}
-                />
-                <span className="switch-track" aria-hidden />
-                Partager les RAW
-              </label>
-            )}
             <Link to={`/admin/shootings?open=${id}`} className="btn btn-ghost">
               Gérer l’accès
             </Link>

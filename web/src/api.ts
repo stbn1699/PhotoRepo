@@ -102,11 +102,14 @@ export interface AdminUser {
   createdAt: string;
   lastLoginAt: string | null;
   shootingIds: number[];
+  /** Shootings dont les RAW sont partagés avec cette personne. */
+  rawShootingIds: number[];
 }
 
 export interface AdminShooting extends Shooting {
   userIds: number[];
-  rawsShared: boolean;
+  /** Personnes avec qui les RAW de ce shooting sont partagés. */
+  rawUserIds: number[];
   rawCount: number;
 }
 

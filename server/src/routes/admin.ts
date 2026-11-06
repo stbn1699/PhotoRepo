@@ -22,7 +22,9 @@ const idListSchema = {
 const USER_COLUMNS = `
   u.id, u.username, u.display_name AS "displayName", u.is_admin AS "isAdmin", u.disabled,
   u.created_at AS "createdAt", u.last_login_at AS "lastLoginAt",
-  COALESCE((SELECT array_agg(a.shooting_id ORDER BY a.shooting_id) FROM shooting_access a WHERE a.user_id = u.id), '{}') AS "shootingIds"`;
+  COALESCE((SELECT array_agg(a.shooting_id ORDER BY a.shooting_id) FROM shooting_access a WHERE a.user_id = u.id), '{}') AS "shootingIds",
+  COALESCE((SELECT array_agg(a.shooting_id ORDER BY a.shooting_id) FROM shooting_access a
+             WHERE a.user_id = u.id AND a.raws_shared), '{}') AS "rawShootingIds"`;
 
 function cleanDisplayName(value: string | null | undefined): string | null {
   const trimmed = value?.trim();
@@ -206,7 +208,9 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   app.get('/api/admin/shootings', async () => {
     const { rows } = await pool.query(
       `SELECT s.id, s.title, s.shot_date AS "date", s.date_precision AS "datePrecision", s.image_count AS "imageCount",
-              s.raws_shared AS "rawsShared", s.raw_count AS "rawCount",
+              s.raw_count AS "rawCount",
+              COALESCE((SELECT array_agg(a.user_id ORDER BY a.user_id) FROM shooting_access a
+                         WHERE a.shooting_id = s.id AND a.raws_shared), '{}') AS "rawUserIds",
               COALESCE((SELECT array_agg(a.user_id ORDER BY a.user_id) FROM shooting_access a WHERE a.shooting_id = s.id), '{}') AS "userIds"
          FROM shootings s
         WHERE s.present
@@ -215,28 +219,35 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     return { shootings: rows };
   });
 
-  /** Réglages d'un shooting : partage des RAW (désactivé par défaut). */
-  app.patch<{ Params: { id: number }; Body: { rawsShared: boolean } }>(
-    '/api/admin/shootings/:id',
+  /**
+   * Partage (ou non) les RAW d'un shooting avec une personne qui y a accès. Désactivé par défaut.
+   * Les RAW restent toujours impossibles à télécharger.
+   */
+  app.put<{ Body: { userId: number; shootingId: number; rawsShared: boolean } }>(
+    '/api/admin/access/raws',
     {
       schema: {
-        params: idParams,
         body: {
           type: 'object',
-          required: ['rawsShared'],
+          required: ['userId', 'shootingId', 'rawsShared'],
           additionalProperties: false,
-          properties: { rawsShared: { type: 'boolean' } },
+          properties: {
+            userId: { type: 'integer', minimum: 1, maximum: 2147483647 },
+            shootingId: { type: 'integer', minimum: 1, maximum: 2147483647 },
+            rawsShared: { type: 'boolean' },
+          },
         },
       },
     },
     async (request, reply) => {
-      const { rowCount } = await pool.query('UPDATE shootings SET raws_shared = $2 WHERE id = $1', [
-        request.params.id,
-        request.body.rawsShared,
-      ]);
-      if (!rowCount) return reply.code(404).send({ error: 'Shooting introuvable' });
+      const { userId, shootingId, rawsShared } = request.body;
+      const { rowCount } = await pool.query(
+        'UPDATE shooting_access SET raws_shared = $3 WHERE user_id = $1 AND shooting_id = $2',
+        [userId, shootingId, rawsShared],
+      );
+      if (!rowCount) return reply.code(404).send({ error: 'Cette personne n’a pas accès à ce shooting' });
       // RAW partagés : on prépare leurs miniatures en arrière-plan.
-      if (request.body.rawsShared) void warmCache(app.log).catch(() => {});
+      if (rawsShared) void warmCache(app.log).catch(() => {});
       return { ok: true };
     },
   );

@@ -15,7 +15,7 @@ interface ShootingRow {
   raws_shared: boolean;
 }
 
-/** Les RAW ne sont visibles que si l'admin les a partagés pour ce shooting (l'admin les voit toujours). */
+/** Les RAW ne sont visibles que si l'admin les a partagés avec cette personne (l'admin les voit toujours). */
 function canSeeRaws(user: SessionUser, shooting: ShootingRow): boolean {
   return user.isAdmin || shooting.raws_shared;
 }
@@ -23,7 +23,9 @@ function canSeeRaws(user: SessionUser, shooting: ShootingRow): boolean {
 /** Le shooting si l'utilisateur y a accès, sinon null (même réponse s'il n'existe pas, pour ne rien dévoiler). */
 async function findAccessibleShooting(user: SessionUser, id: number): Promise<ShootingRow | null> {
   const { rows } = await pool.query<ShootingRow>(
-    `SELECT s.id, s.folder_name, s.title, s.shot_date AS date, s.date_precision, s.raws_shared
+    `SELECT s.id, s.folder_name, s.title, s.shot_date AS date, s.date_precision,
+            COALESCE((SELECT a.raws_shared FROM shooting_access a WHERE a.shooting_id = s.id AND a.user_id = $3), false)
+              AS raws_shared
        FROM shootings s
       WHERE s.id = $1 AND s.present
         AND ($2::boolean OR EXISTS (
@@ -114,7 +116,7 @@ export async function galleryRoutes(app: FastifyInstance): Promise<void> {
           date: shooting.date,
           datePrecision: shooting.date_precision,
           imageCount: images.filter((i) => 'original' in i.versions).length,
-          rawsShared: shooting.raws_shared,
+          rawsShared: canSeeRaws(user, shooting),
         },
         images,
         myLikes: myLikes.rows.map((r) => r.image_number),

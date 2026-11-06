@@ -82,6 +82,12 @@ const migrations: string[] = [
   );
   CREATE INDEX likes_shooting_idx ON likes (shooting_id, image_number);
   `,
+  // 4 : partage des RAW par personne (et non plus par shooting), désactivé par défaut
+  `
+  ALTER TABLE shooting_access ADD COLUMN raws_shared boolean NOT NULL DEFAULT false;
+  UPDATE shooting_access a SET raws_shared = true FROM shootings s WHERE s.id = a.shooting_id AND s.raws_shared;
+  ALTER TABLE shootings DROP COLUMN raws_shared;
+  `,
 ];
 
 /** Attend que la base réponde (au démarrage du NAS, Postgres peut être plus lent que le site). */

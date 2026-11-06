@@ -32,15 +32,20 @@ export function AdminTabs() {
 function useAutoSave(save: (ids: number[]) => Promise<unknown>, onError: (message: string) => void) {
   const [saving, setSaving] = useState(false);
   const pending = useRef<number[] | null>(null);
-  const running = useRef(false);
+  const running = useRef<Promise<void> | null>(null);
 
   return {
     saving,
+    /** Attend que les accès en cours d'envoi soient enregistrés. */
+    whenIdle: useCallback(async () => {
+      while (running.current) await running.current;
+    }, []),
     queue: useCallback(
       async (ids: number[]) => {
         pending.current = ids;
         if (running.current) return;
-        running.current = true;
+        let done: () => void = () => {};
+        running.current = new Promise<void>((r) => (done = r));
         setSaving(true);
         try {
           while (pending.current) {
@@ -51,13 +56,24 @@ function useAutoSave(save: (ids: number[]) => Promise<unknown>, onError: (messag
         } catch (err) {
           onError(err instanceof Error ? err.message : 'Erreur');
         } finally {
-          running.current = false;
+          running.current = null;
+          done();
           setSaving(false);
         }
       },
       [save, onError],
     ),
   };
+}
+
+/** Option « RAW » à côté de chaque accès coché : partage les RAW avec cette personne. */
+const RAW_EXTRA = {
+  label: 'RAW',
+  title: 'Partager les RAW avec cette personne (aperçus filigranés, jamais téléchargeables)',
+};
+
+async function setRawsShared(userId: number, shootingId: number, rawsShared: boolean) {
+  await api.put('/api/admin/access/raws', { userId, shootingId, rawsShared });
 }
 
 // ---------------------------------------------------------------------------
@@ -237,6 +253,7 @@ export function AdminUserPage() {
   const [user, setUser] = useState<AdminUser | null>(null);
   const [shootings, setShootings] = useState<AdminShooting[] | null>(null);
   const [checked, setChecked] = useState<Set<number>>(new Set());
+  const [rawChecked, setRawChecked] = useState<Set<number>>(new Set());
   const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
   const [notice, setNotice] = useState<string | null>(null);
@@ -251,6 +268,7 @@ export function AdminUserPage() {
       setUser(u.user);
       setDisplayName(u.user.displayName ?? '');
       setChecked(new Set(u.user.shootingIds));
+      setRawChecked(new Set(u.user.rawShootingIds));
       setShootings(s.shootings);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur');
@@ -272,7 +290,25 @@ export function AdminUserPage() {
     },
     [load],
   );
-  const { saving, queue } = useAutoSave(save, onSaveError);
+  const { saving, queue, whenIdle } = useAutoSave(save, onSaveError);
+
+  async function toggleUserRaws(shootingId: number, on: boolean) {
+    const apply = (value: boolean) =>
+      setRawChecked((prev) => {
+        const next = new Set(prev);
+        if (value) next.add(shootingId);
+        else next.delete(shootingId);
+        return next;
+      });
+    apply(on);
+    try {
+      await whenIdle(); // l'accès vient peut-être d'être coché : on attend qu'il soit enregistré
+      await setRawsShared(id, shootingId, on);
+    } catch (err) {
+      apply(!on);
+      setError(err instanceof Error ? err.message : 'Erreur');
+    }
+  }
 
   function flash(message: string) {
     setError(null);
@@ -347,11 +383,19 @@ export function AdminUserPage() {
             items={shootings.map((s) => ({
               id: s.id,
               label: s.title,
-              sublabel: `${formatShootingDate(s)} · ${s.imageCount} photos`,
+              sublabel: `${formatShootingDate(s)} · ${s.imageCount} photos${s.rawCount > 0 ? ` · ${s.rawCount} RAW` : ''}`,
             }))}
+            extra={{
+              ...RAW_EXTRA,
+              isAvailable: (sid) => (shootings.find((s) => s.id === sid)?.rawCount ?? 0) > 0,
+              isOn: (sid) => rawChecked.has(sid),
+              onToggle: (sid, on) => void toggleUserRaws(sid, on),
+            }}
             checked={checked}
             onChange={(next) => {
               setChecked(next);
+              // Accès retiré : le partage des RAW part avec (à réactiver si l'accès revient).
+              setRawChecked((prev) => new Set([...prev].filter((sid) => next.has(sid))));
               void queue([...next]);
             }}
             saving={saving}
@@ -473,7 +517,8 @@ export function AdminShootingsPage() {
                   <strong>{s.title}</strong>
                   <div className="muted small">
                     {formatShootingDate(s)} · {s.imageCount} photos
-                    {s.rawCount > 0 && ` · ${s.rawCount} RAW${s.rawsShared ? ' (partagés)' : ''}`}
+                    {s.rawCount > 0 &&
+                      ` · ${s.rawCount} RAW${s.rawUserIds.length > 0 ? ` (partagés avec ${s.rawUserIds.length} personne${s.rawUserIds.length > 1 ? 's' : ''})` : ''}`}
                   </div>
                 </div>
                 <div className="chips">
@@ -495,8 +540,8 @@ export function AdminShootingsPage() {
                   onSaved={(userIds) =>
                     setShootings((prev) => prev?.map((x) => (x.id === s.id ? { ...x, userIds } : x)) ?? prev)
                   }
-                  onRawsChange={(rawsShared) =>
-                    setShootings((prev) => prev?.map((x) => (x.id === s.id ? { ...x, rawsShared } : x)) ?? prev)
+                  onRawsChange={(rawUserIds) =>
+                    setShootings((prev) => prev?.map((x) => (x.id === s.id ? { ...x, rawUserIds } : x)) ?? prev)
                   }
                   onError={(m) => {
                     setError(`Accès non enregistrés : ${m}`);
@@ -522,7 +567,7 @@ function ShootingAccess({
   shooting: AdminShooting;
   users: AdminUser[];
   onSaved: (userIds: number[]) => void;
-  onRawsChange: (shared: boolean) => void;
+  onRawsChange: (rawUserIds: number[]) => void;
   onError: (message: string) => void;
 }) {
   const [checked, setChecked] = useState(() => new Set(shooting.userIds));
@@ -533,16 +578,20 @@ function ShootingAccess({
     },
     [shooting.id, onSaved],
   );
-  const { saving, queue } = useAutoSave(save, onError);
-  const [rawsShared, setRawsShared] = useState(shooting.rawsShared);
+  const { saving, queue, whenIdle } = useAutoSave(save, onError);
+  const [rawChecked, setRawChecked] = useState(() => new Set(shooting.rawUserIds));
 
-  async function toggleRaws(shared: boolean) {
-    setRawsShared(shared);
+  async function toggleRaws(userId: number, on: boolean) {
+    const next = new Set(rawChecked);
+    if (on) next.add(userId);
+    else next.delete(userId);
+    setRawChecked(next);
     try {
-      await api.patch(`/api/admin/shootings/${shooting.id}`, { rawsShared: shared });
-      onRawsChange(shared);
+      await whenIdle(); // l'accès vient peut-être d'être coché : on attend qu'il soit enregistré
+      await setRawsShared(userId, shooting.id, on);
+      onRawsChange([...next].sort((a, b) => a - b));
     } catch (err) {
-      setRawsShared(!shared);
+      setRawChecked(rawChecked);
       onError(err instanceof Error ? err.message : 'Erreur');
     }
   }
@@ -550,11 +599,10 @@ function ShootingAccess({
   return (
     <div className="panel-body">
       {shooting.rawCount > 0 && (
-        <label className="switch panel-switch">
-          <input type="checkbox" checked={rawsShared} onChange={(e) => toggleRaws(e.target.checked)} />
-          <span className="switch-track" aria-hidden />
-          Partager les RAW ({shooting.rawCount}) · visibles en aperçu filigrané, jamais téléchargeables
-        </label>
+        <p className="muted small panel-hint">
+          Ce shooting a {shooting.rawCount} RAW. Active « RAW » à côté d’une personne pour les lui partager : aperçus
+          filigranés, jamais téléchargeables.
+        </p>
       )}
       <AccessList
         items={users.map((u) => ({
@@ -562,9 +610,25 @@ function ShootingAccess({
           label: userLabel(u),
           sublabel: u.disabled ? 'désactivé' : u.displayName ? `@${u.username}` : undefined,
         }))}
+        extra={
+          shooting.rawCount > 0
+            ? {
+                ...RAW_EXTRA,
+                isAvailable: () => true,
+                isOn: (uid) => rawChecked.has(uid),
+                onToggle: (uid, on) => void toggleRaws(uid, on),
+              }
+            : undefined
+        }
         checked={checked}
         onChange={(next) => {
           setChecked(next);
+          // Accès retiré : le partage des RAW part avec.
+          const keptRaws = [...rawChecked].filter((uid) => next.has(uid));
+          if (keptRaws.length !== rawChecked.size) {
+            setRawChecked(new Set(keptRaws));
+            onRawsChange(keptRaws);
+          }
           void queue([...next]);
         }}
         saving={saving}

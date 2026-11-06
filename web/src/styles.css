@@ -1372,3 +1372,49 @@ a.btn {
   background: rgba(255, 90, 110, 0.14);
   color: #ff8a98;
 }
+
+/* Option « RAW » à côté de chaque accès */
+.access-list li.access-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding-right: 10px;
+}
+.access-list li.access-row.is-checked {
+  border-color: var(--accent);
+  background: rgba(232, 213, 181, 0.06);
+}
+.access-list li.access-row > label:first-child {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+}
+.switch-small {
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.switch-small .switch-track {
+  width: 30px;
+  height: 18px;
+}
+.switch-small .switch-track::after {
+  width: 12px;
+  height: 12px;
+}
+.switch-small input:checked + .switch-track::after {
+  transform: translateX(12px);
+}
+.panel-hint {
+  margin: 0 0 12px;
+}
+.access-list .switch-small {
+  border: 0;
+  padding: 0;
+  background: none;
+}
