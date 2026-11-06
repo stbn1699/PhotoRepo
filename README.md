@@ -23,6 +23,14 @@ Photographie/
 - Un nouveau dossier est **caché pour tout le monde** sauf l'admin, tant qu'on n'a pas donné l'accès.
 - Le dossier Photographie est monté **en lecture seule** : le site ne modifie jamais les photos.
 
+## RAW
+
+- Les RAW sont lus dans `Raws/<même nom de dossier que le shooting>/` à la racine du lecteur (nom comparé sans tenir compte des majuscules). Formats : `.NEF` et `.DNG`. Les `.xmp`, `.jpg`, vidéos… sont ignorés.
+- Le numéro est le dernier nombre du nom (`EBA_0012.NEF` → 12). Un RAW n'est affiché que si une originale porte le même numéro.
+- Le site affiche l'aperçu JPEG que l'appareil intègre au fichier (le rendu de l'appareil, sans les retouches Lightroom), réduit à 1600 px et **filigrané avec la signature**.
+- **Partage désactivé par défaut**, shooting par shooting : interrupteur « Partager les RAW » dans la galerie (admin) ou dans *Admin → Accès par shooting*. L'admin voit toujours les RAW.
+- **Les RAW ne sont jamais téléchargeables**, même par l'admin : le serveur refuse, il n'y a pas de bouton, et clic droit / appui long / glisser sont bloqués. Les aperçus ne sont pas gardés en cache par le navigateur.
+
 ## Signature et icône
 
 - La signature `copyright.png` à la racine du lecteur Photographie (la même que celle de Lightroom) remplace le nom du site, en haut à gauche et sur la page de connexion. Elle est recolorée aux couleurs du site, sans toucher au fichier. Si tu la changes sur le NAS, le site suit (dans l'heure, à cause du cache). Pour en utiliser une autre : variable `SIGNATURE_FILE`. Sans signature, c'est le nom du site (`SITE_NAME`) qui s'affiche.

@@ -205,6 +205,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   app.get('/api/admin/shootings', async () => {
     const { rows } = await pool.query(
       `SELECT s.id, s.title, s.shot_date AS "date", s.date_precision AS "datePrecision", s.image_count AS "imageCount",
+              s.raws_shared AS "rawsShared", s.raw_count AS "rawCount",
               COALESCE((SELECT array_agg(a.user_id ORDER BY a.user_id) FROM shooting_access a WHERE a.shooting_id = s.id), '{}') AS "userIds"
          FROM shootings s
         WHERE s.present
@@ -212,6 +213,30 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     );
     return { shootings: rows };
   });
+
+  /** Réglages d'un shooting : partage des RAW (désactivé par défaut). */
+  app.patch<{ Params: { id: number }; Body: { rawsShared: boolean } }>(
+    '/api/admin/shootings/:id',
+    {
+      schema: {
+        params: idParams,
+        body: {
+          type: 'object',
+          required: ['rawsShared'],
+          additionalProperties: false,
+          properties: { rawsShared: { type: 'boolean' } },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { rowCount } = await pool.query('UPDATE shootings SET raws_shared = $2 WHERE id = $1', [
+        request.params.id,
+        request.body.rawsShared,
+      ]);
+      if (!rowCount) return reply.code(404).send({ error: 'Shooting introuvable' });
+      return { ok: true };
+    },
+  );
 
   /** Remplace la liste des utilisateurs qui ont accès à un shooting. */
   app.put<{ Params: { id: number }; Body: { userIds: number[] } }>(

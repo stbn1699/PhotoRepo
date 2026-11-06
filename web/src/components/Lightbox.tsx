@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { api, imageUrl, VERSION_LABELS, VERSIONS, type GalleryImage, type Version } from '../api';
+import { api, imageUrl, isDownloadable, VERSION_LABELS, VERSIONS, type GalleryImage, type Version } from '../api';
 
 interface Props {
   shootingId: number;
@@ -20,6 +20,7 @@ export function Lightbox({ shootingId, images, index, version: galleryVersion, o
   const info = image.versions[version]!;
   const [loaded, setLoaded] = useState(false);
 
+  const isRaw = version === 'raw';
   const previewSrc = imageUrl(shootingId, image.number, version, 'preview', info.token);
   const thumbSrc = imageUrl(shootingId, image.number, version, 'thumb', info.token);
 
@@ -96,7 +97,7 @@ export function Lightbox({ shootingId, images, index, version: galleryVersion, o
           {index + 1} / {images.length}
         </span>
         <div className="segmented segmented-dark">
-          {VERSIONS.map((v) => (
+          {VERSIONS.filter((v) => v !== 'raw' || image.versions.raw).map((v) => (
             <button
               key={v}
               className={v === version ? 'active' : ''}
@@ -119,7 +120,8 @@ export function Lightbox({ shootingId, images, index, version: galleryVersion, o
           </button>
         )}
         <div
-          className="lightbox-image"
+          className={`lightbox-image ${isRaw ? 'protected' : ''}`}
+          onContextMenu={isRaw ? (e) => e.preventDefault() : undefined}
           style={{
             aspectRatio: `${info.width} / ${info.height}`,
             // Aussi grande que possible sans dépasser ni en largeur ni en hauteur.
@@ -136,6 +138,8 @@ export function Lightbox({ shootingId, images, index, version: galleryVersion, o
             onLoad={() => setLoaded(true)}
             draggable={false}
           />
+          {/* RAW : un calque transparent par-dessus empêche « Enregistrer l'image » (clic droit, appui long). */}
+          {isRaw && <div className="protect-layer" aria-hidden />}
         </div>
         {index < images.length - 1 && (
           <button className="nav-btn nav-next" onClick={() => go(1)} aria-label="Photo suivante">
@@ -145,9 +149,13 @@ export function Lightbox({ shootingId, images, index, version: galleryVersion, o
       </div>
 
       <div className="lightbox-bottom">
-        <button className="btn btn-primary" onClick={() => onDownload(image, version)}>
-          Télécharger
-        </button>
+        {isDownloadable(version) ? (
+          <button className="btn btn-primary" onClick={() => onDownload(image, version)}>
+            Télécharger
+          </button>
+        ) : (
+          <span className="raw-note">🔒 Fichier RAW · aperçu uniquement, téléchargement impossible</span>
+        )}
       </div>
     </div>
   );

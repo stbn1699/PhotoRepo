@@ -5,6 +5,8 @@ import sharp from 'sharp';
 import { config } from './config.js';
 import { pool } from './db.js';
 import { getShootingIndex, VERSIONS, type ImageFile } from './library.js';
+import { readRawPreview } from './raw.js';
+import { watermarkLayer } from './signature.js';
 
 // Pas de cache interne de libvips : on traite de grosses images une par une, inutile de les garder en mémoire.
 sharp.cache(false);
@@ -15,6 +17,10 @@ export const RENDITIONS = {
   preview: { maxSize: 2048, quality: 82 },
 } as const;
 export type Rendition = keyof typeof RENDITIONS;
+
+/** Les aperçus RAW sont volontairement plus petits, et toujours filigranés. */
+const RAW_MAX_SIZE: Record<Rendition, number> = { thumb: 800, preview: 1600 };
+const WATERMARK_VERSION = 'wm1';
 
 // ---------------------------------------------------------------------------
 // File d'attente : on limite le nombre de conversions simultanées pour ne pas
@@ -57,7 +63,7 @@ function cachePath(image: ImageFile, rendition: Rendition): string {
   // produit automatiquement une nouvelle miniature.
   const key = crypto
     .createHash('sha1')
-    .update(`${image.path}|${image.size}|${Math.round(image.mtimeMs)}|${rendition}`)
+    .update(`${image.path}|${image.size}|${Math.round(image.mtimeMs)}|${rendition}${image.raw ? `|${WATERMARK_VERSION}` : ''}`)
     .digest('hex');
   return path.join(config.cacheDir, rendition, key.slice(0, 2), `${key}.webp`);
 }
@@ -90,11 +96,25 @@ async function render(image: ImageFile, rendition: Rendition, target: string): P
   await fs.mkdir(path.dirname(target), { recursive: true });
   const tmp = `${target}.${process.pid}.${Date.now()}.tmp`;
   try {
-    await sharp(image.path)
-      .rotate() // applique l'orientation EXIF
-      .resize({ width: maxSize, height: maxSize, fit: 'inside', withoutEnlargement: true })
-      .webp({ quality })
-      .toFile(tmp);
+    if (image.raw) {
+      // RAW : on part de l'aperçu JPEG intégré, plus petit, avec le filigrane par-dessus.
+      const size = RAW_MAX_SIZE[rendition];
+      const jpeg = await readRawPreview(image.path, image.raw);
+      const { data, info } = await sharp(jpeg)
+        .rotate(image.raw.rotate)
+        .resize({ width: size, height: size, fit: 'inside', withoutEnlargement: true })
+        .toBuffer({ resolveWithObject: true });
+      await sharp(data)
+        .composite([{ input: await watermarkLayer(info.width, info.height) }])
+        .webp({ quality })
+        .toFile(tmp);
+    } else {
+      await sharp(image.path)
+        .rotate() // applique l'orientation EXIF
+        .resize({ width: maxSize, height: maxSize, fit: 'inside', withoutEnlargement: true })
+        .webp({ quality })
+        .toFile(tmp);
+    }
     await fs.rename(tmp, target);
   } catch (err) {
     await fs.rm(tmp, { force: true });

@@ -11,6 +11,7 @@ import {
   type GalleryImage,
   type ShootingDetail,
   type Version,
+  isDownloadable,
 } from '../api';
 import { DownloadDialog } from '../components/DownloadDialog';
 import { Lightbox } from '../components/Lightbox';
@@ -40,7 +41,7 @@ export function ShootingPage() {
   // Images visibles : celles qui existent dans la version choisie.
   const images = useMemo(() => data?.images.filter((i) => i.versions[version]) ?? [], [data, version]);
   const counts = useMemo(() => {
-    const c = { original: 0, carre: 0, story: 0 } as Record<Version, number>;
+    const c = { original: 0, carre: 0, story: 0, raw: 0 } as Record<Version, number>;
     for (const img of data?.images ?? []) for (const v of VERSIONS) if (img.versions[v]) c[v]++;
     return c;
   }, [data]);
@@ -48,6 +49,21 @@ export function ShootingPage() {
   function changeVersion(v: Version) {
     setVersion(v);
     setSelected(new Set());
+    if (!isDownloadable(v)) setSelecting(false);
+  }
+
+  const [savingRaws, setSavingRaws] = useState(false);
+  async function toggleRawsShared(shared: boolean) {
+    if (!data) return;
+    setSavingRaws(true);
+    try {
+      await api.patch(`/api/admin/shootings/${id}`, { rawsShared: shared });
+      setData({ ...data, shooting: { ...data.shooting, rawsShared: shared } });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur');
+    } finally {
+      setSavingRaws(false);
+    }
   }
 
   const toItem = useCallback(
@@ -59,6 +75,7 @@ export function ShootingPage() {
   );
 
   function downloadOne(img: GalleryImage, v: Version) {
+    if (!isDownloadable(v)) return; // les RAW ne se téléchargent jamais
     const item = toItem(img, v, false);
     // Téléphone : menu Partager pour enregistrer dans la galerie. Ordinateur : téléchargement direct.
     if (canShareFiles()) setDownloadItems([item]);
@@ -66,7 +83,7 @@ export function ShootingPage() {
   }
 
   function downloadMany(list: GalleryImage[]) {
-    if (list.length === 0) return;
+    if (list.length === 0 || !isDownloadable(version)) return;
     if (list.length === 1) return downloadOne(list[0], version);
     setDownloadItems(list.map((img) => toItem(img, version, true)));
   }
@@ -96,6 +113,9 @@ export function ShootingPage() {
   if (!data) return <GallerySkeleton />;
 
   const allSelected = images.length > 0 && selected.size === images.length;
+  const isRaw = version === 'raw';
+  // L'onglet RAW n'apparaît que s'il y a des RAW (l'admin les voit toujours, les modèles seulement si partagés).
+  const shownVersions = VERSIONS.filter((v) => v !== 'raw' || counts.raw > 0);
 
   return (
     <>
@@ -108,9 +128,23 @@ export function ShootingPage() {
           </p>
         </div>
         {user?.isAdmin && (
-          <Link to={`/admin/shootings?open=${id}`} className="btn btn-ghost">
-            Gérer l’accès
-          </Link>
+          <div className="gallery-admin">
+            {counts.raw > 0 && (
+              <label className="switch" title="Les modèles qui ont accès à ce shooting pourront voir les RAW (jamais les télécharger)">
+                <input
+                  type="checkbox"
+                  checked={data.shooting.rawsShared}
+                  disabled={savingRaws}
+                  onChange={(e) => toggleRawsShared(e.target.checked)}
+                />
+                <span className="switch-track" aria-hidden />
+                Partager les RAW
+              </label>
+            )}
+            <Link to={`/admin/shootings?open=${id}`} className="btn btn-ghost">
+              Gérer l’accès
+            </Link>
+          </div>
         )}
       </div>
 
@@ -130,7 +164,7 @@ export function ShootingPage() {
 
       <div className="gallery-toolbar">
         <div className="segmented" role="tablist" aria-label="Version des photos">
-          {VERSIONS.map((v) => (
+          {shownVersions.map((v) => (
             <button
               key={v}
               role="tab"
@@ -144,7 +178,9 @@ export function ShootingPage() {
           ))}
         </div>
         <div className="toolbar-actions">
-          {selecting ? (
+          {isRaw ? (
+            <span className="raw-note">🔒 Aperçus protégés · les RAW ne se téléchargent pas</span>
+          ) : selecting ? (
             <>
               <button className="btn btn-ghost" onClick={() => setSelected(allSelected ? new Set() : new Set(images.map((i) => i.number)))}>
                 {allSelected ? 'Tout désélectionner' : 'Tout sélectionner'}
@@ -174,7 +210,8 @@ export function ShootingPage() {
           return (
             <button
               key={img.number}
-              className={`tile ${selecting ? 'is-selecting' : ''} ${isSelected ? 'is-selected' : ''}`}
+              className={`tile ${selecting ? 'is-selecting' : ''} ${isSelected ? 'is-selected' : ''} ${isRaw ? 'protected' : ''}`}
+              onContextMenu={isRaw ? (e) => e.preventDefault() : undefined}
               style={{ flexGrow: ratio, flexBasis: `calc(var(--row-h) * ${ratio})` }}
               onClick={() => (selecting ? toggle(img.number) : setOpenIndex(i))}
               aria-pressed={selecting ? isSelected : undefined}
@@ -186,6 +223,7 @@ export function ShootingPage() {
                 loading="lazy"
                 decoding="async"
                 style={{ aspectRatio: `${info.width} / ${info.height}` }}
+                draggable={!isRaw}
               />
               {selecting && <span className="check" aria-hidden />}
             </button>

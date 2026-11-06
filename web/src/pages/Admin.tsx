@@ -473,6 +473,7 @@ export function AdminShootingsPage() {
                   <strong>{s.title}</strong>
                   <div className="muted small">
                     {formatShootingDate(s)} · {s.imageCount} photos
+                    {s.rawCount > 0 && ` · ${s.rawCount} RAW${s.rawsShared ? ' (partagés)' : ''}`}
                   </div>
                 </div>
                 <div className="chips">
@@ -494,6 +495,9 @@ export function AdminShootingsPage() {
                   onSaved={(userIds) =>
                     setShootings((prev) => prev?.map((x) => (x.id === s.id ? { ...x, userIds } : x)) ?? prev)
                   }
+                  onRawsChange={(rawsShared) =>
+                    setShootings((prev) => prev?.map((x) => (x.id === s.id ? { ...x, rawsShared } : x)) ?? prev)
+                  }
                   onError={(m) => {
                     setError(`Accès non enregistrés : ${m}`);
                     void load();
@@ -512,11 +516,13 @@ function ShootingAccess({
   shooting,
   users,
   onSaved,
+  onRawsChange,
   onError,
 }: {
   shooting: AdminShooting;
   users: AdminUser[];
   onSaved: (userIds: number[]) => void;
+  onRawsChange: (shared: boolean) => void;
   onError: (message: string) => void;
 }) {
   const [checked, setChecked] = useState(() => new Set(shooting.userIds));
@@ -528,9 +534,28 @@ function ShootingAccess({
     [shooting.id, onSaved],
   );
   const { saving, queue } = useAutoSave(save, onError);
+  const [rawsShared, setRawsShared] = useState(shooting.rawsShared);
+
+  async function toggleRaws(shared: boolean) {
+    setRawsShared(shared);
+    try {
+      await api.patch(`/api/admin/shootings/${shooting.id}`, { rawsShared: shared });
+      onRawsChange(shared);
+    } catch (err) {
+      setRawsShared(!shared);
+      onError(err instanceof Error ? err.message : 'Erreur');
+    }
+  }
 
   return (
     <div className="panel-body">
+      {shooting.rawCount > 0 && (
+        <label className="switch panel-switch">
+          <input type="checkbox" checked={rawsShared} onChange={(e) => toggleRaws(e.target.checked)} />
+          <span className="switch-track" aria-hidden />
+          Partager les RAW ({shooting.rawCount}) · visibles en aperçu filigrané, jamais téléchargeables
+        </label>
+      )}
       <AccessList
         items={users.map((u) => ({
           id: u.id,

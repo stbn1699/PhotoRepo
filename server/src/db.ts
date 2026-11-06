@@ -65,6 +65,12 @@ const migrations: string[] = [
   CREATE INDEX events_created_idx ON events (created_at DESC);
   CREATE INDEX events_user_idx ON events (user_id, created_at DESC);
   `,
+  // 2 : partage des RAW par shooting (désactivé par défaut)
+  `
+  ALTER TABLE shootings
+    ADD COLUMN raws_shared boolean NOT NULL DEFAULT false,
+    ADD COLUMN raw_count integer NOT NULL DEFAULT 0;
+  `,
 ];
 
 /** Attend que la base réponde (au démarrage du NAS, Postgres peut être plus lent que le site). */

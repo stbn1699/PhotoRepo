@@ -12,12 +12,18 @@ interface ShootingRow {
   title: string;
   date: string;
   date_precision: 'day' | 'month';
+  raws_shared: boolean;
+}
+
+/** Les RAW ne sont visibles que si l'admin les a partagés pour ce shooting (l'admin les voit toujours). */
+function canSeeRaws(user: SessionUser, shooting: ShootingRow): boolean {
+  return user.isAdmin || shooting.raws_shared;
 }
 
 /** Le shooting si l'utilisateur y a accès, sinon null (même réponse s'il n'existe pas, pour ne rien dévoiler). */
 async function findAccessibleShooting(user: SessionUser, id: number): Promise<ShootingRow | null> {
   const { rows } = await pool.query<ShootingRow>(
-    `SELECT s.id, s.folder_name, s.title, s.shot_date AS date, s.date_precision
+    `SELECT s.id, s.folder_name, s.title, s.shot_date AS date, s.date_precision, s.raws_shared
        FROM shootings s
       WHERE s.id = $1 AND s.present
         AND ($2::boolean OR EXISTS (
@@ -68,10 +74,11 @@ export async function galleryRoutes(app: FastifyInstance): Promise<void> {
       if (!shooting) return reply.code(404).send({ error: 'Shooting introuvable' });
 
       const index = await getShootingIndex(shooting.folder_name);
+      const showRaws = canSeeRaws(user, shooting);
       const images = [...index.images.entries()].map(([number, versions]) => ({
         number,
         versions: Object.fromEntries(
-          VERSIONS.filter((v) => versions[v]).map((v) => {
+          VERSIONS.filter((v) => versions[v] && (v !== 'raw' || showRaws)).map((v) => {
             const f = versions[v]!;
             return [v, { width: f.width, height: f.height, size: f.size, name: f.name, token: versionToken(f) }];
           }),
@@ -86,6 +93,7 @@ export async function galleryRoutes(app: FastifyInstance): Promise<void> {
           date: shooting.date,
           datePrecision: shooting.date_precision,
           imageCount: images.length,
+          rawsShared: shooting.raws_shared,
         },
         images,
         // Visible uniquement par l'admin : fichiers ignorés car leur numéro était déjà pris.
@@ -127,6 +135,11 @@ export async function galleryRoutes(app: FastifyInstance): Promise<void> {
 
       const shooting = await findAccessibleShooting(user, id);
       if (!shooting) return reply.code(404).send({ error: 'Image introuvable' });
+      if (version === 'raw') {
+        if (!canSeeRaws(user, shooting)) return reply.code(404).send({ error: 'Image introuvable' });
+        // Les RAW ne sont jamais téléchargeables, même pour l'admin : seuls les aperçus filigranés sont servis.
+        if (kind === 'original') return reply.code(403).send({ error: 'Les fichiers RAW ne sont pas téléchargeables' });
+      }
       const image = (await getShootingIndex(shooting.folder_name)).images.get(number)?.[version];
       if (!image) return reply.code(404).send({ error: 'Image introuvable' });
 
@@ -151,7 +164,8 @@ export async function galleryRoutes(app: FastifyInstance): Promise<void> {
 
       const file = await getRendition(image, kind as Rendition);
       // L'URL contient un jeton qui change avec le fichier : le navigateur peut garder l'image longtemps.
-      reply.header('Cache-Control', 'private, max-age=31536000, immutable');
+      // Aperçus RAW : pas de cache navigateur (ils ne restent pas sur le téléphone de la personne).
+      reply.header('Cache-Control', version === 'raw' ? 'private, no-store' : 'private, max-age=31536000, immutable');
       const stat = await fs.promises.stat(file);
       return sendFile(reply, file, stat.size, 'image/webp');
     },
@@ -184,6 +198,7 @@ export async function galleryRoutes(app: FastifyInstance): Promise<void> {
       if (!isVersion(version)) return reply.code(400).send({ error: 'Version inconnue' });
       const shooting = await findAccessibleShooting(user, id);
       if (!shooting) return reply.code(404).send({ error: 'Image introuvable' });
+      if (version === 'raw' && !canSeeRaws(user, shooting)) return reply.code(404).send({ error: 'Image introuvable' });
       if (!(await getShootingIndex(shooting.folder_name)).images.get(number)?.[version]) {
         return reply.code(404).send({ error: 'Image introuvable' });
       }

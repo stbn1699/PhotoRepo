@@ -50,9 +50,11 @@ export function formatShootingDate(s: Pick<Shooting, 'date' | 'datePrecision'>):
     : date.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
 }
 
-export type Version = 'original' | 'carre' | 'story';
-export const VERSIONS: Version[] = ['original', 'carre', 'story'];
-export const VERSION_LABELS: Record<Version, string> = { original: 'Originale', carre: 'Carré', story: 'Story' };
+export type Version = 'original' | 'carre' | 'story' | 'raw';
+export const VERSIONS: Version[] = ['original', 'carre', 'story', 'raw'];
+export const VERSION_LABELS: Record<Version, string> = { original: 'Originale', carre: 'Carré', story: 'Story', raw: 'RAW' };
+/** Versions téléchargeables (les RAW ne le sont jamais). */
+export const isDownloadable = (v: Version) => v !== 'raw';
 
 export interface ImageVersionInfo {
   width: number;
@@ -68,7 +70,7 @@ export interface GalleryImage {
 }
 
 export interface ShootingDetail {
-  shooting: Shooting;
+  shooting: Shooting & { rawsShared: boolean };
   images: GalleryImage[];
   duplicates?: string[];
 }
@@ -100,6 +102,8 @@ export interface AdminUser {
 
 export interface AdminShooting extends Shooting {
   userIds: number[];
+  rawsShared: boolean;
+  rawCount: number;
 }
 
 export function userLabel(u: Pick<AdminUser, 'username' | 'displayName'>): string {

@@ -3,9 +3,14 @@ import path from 'node:path';
 import sharp from 'sharp';
 import { config } from './config.js';
 import { pool } from './db.js';
+import { findRawPreview, RAW_EXTENSIONS } from './raw.js';
 
-/** Les versions possibles d'une image. "original" est la seule obligatoire. */
-export const VERSIONS = ['original', 'carre', 'story'] as const;
+/**
+ * Les versions possibles d'une image. "original" est la seule obligatoire.
+ * "raw" = le fichier brut de l'appareil (dossier Raws/), visible seulement si l'admin le partage,
+ * et jamais téléchargeable.
+ */
+export const VERSIONS = ['original', 'carre', 'story', 'raw'] as const;
 export type Version = (typeof VERSIONS)[number];
 
 export function isVersion(value: string): value is Version {
@@ -60,8 +65,8 @@ export function parseFolderName(name: string): ParsedFolder | null {
   };
 }
 
-export function parseImageNumber(fileName: string): number | null {
-  if (!IMAGE_EXTENSIONS.has(path.extname(fileName).toLowerCase())) return null;
+export function parseImageNumber(fileName: string, extensions: Set<string> = IMAGE_EXTENSIONS): number | null {
+  if (!extensions.has(path.extname(fileName).toLowerCase())) return null;
   const m = IMAGE_NUMBER_RE.exec(fileName);
   return m ? Number(m[1]) : null;
 }
@@ -86,6 +91,8 @@ export interface ImageFile {
   mtimeMs: number;
   width: number;
   height: number;
+  /** Pour un RAW : où se trouve l'aperçu JPEG intégré, et comment le tourner. */
+  raw?: { offset: number; length: number; rotate: number };
 }
 
 export type ImageVersions = Partial<Record<Version, ImageFile>>;
@@ -150,8 +157,42 @@ async function buildIndex(folderName: string): Promise<ShootingIndex> {
     byVersion.set(version, files);
   }
 
-  const images = new Map<number, ImageVersions>();
   const originals = byVersion.get('original')!;
+
+  // RAW : dans Raws/<même nom de dossier>/ à la racine du lecteur. On ne garde que ceux
+  // qui ont une originale du même numéro (les .xmp, .jpg, vidéos… sont ignorés).
+  const rawDir = await findRawDir(folderName);
+  if (rawDir) {
+    const raws = new Map<number, ImageFile>();
+    const names = (await fs.readdir(rawDir, { withFileTypes: true }))
+      .filter((e) => e.isFile())
+      .map((e) => e.name)
+      .sort((a, b) => a.localeCompare(b, 'fr', { numeric: true }));
+    for (const name of names) {
+      const number = parseImageNumber(name, RAW_EXTENSIONS);
+      if (number === null || !originals.has(number)) continue;
+      if (raws.has(number)) {
+        duplicates.push(path.join(path.basename(path.dirname(rawDir)), path.basename(rawDir), name));
+        continue;
+      }
+      const filePath = path.join(rawDir, name);
+      const stat = await fs.stat(filePath);
+      const info = await getRawInfo(filePath, stat.size, stat.mtimeMs);
+      if (!info) continue; // format non reconnu
+      raws.set(number, {
+        path: filePath,
+        name,
+        size: stat.size,
+        mtimeMs: stat.mtimeMs,
+        width: info.width,
+        height: info.height,
+        raw: { offset: info.offset, length: info.length, rotate: info.rotate },
+      });
+    }
+    byVersion.set('raw', raws);
+  }
+
+  const images = new Map<number, ImageVersions>();
   for (const number of [...originals.keys()].sort((a, b) => a - b)) {
     const versions: ImageVersions = {};
     for (const v of VERSIONS) {
@@ -164,13 +205,47 @@ async function buildIndex(folderName: string): Promise<ShootingIndex> {
   return { images, duplicates };
 }
 
+// Dossier Raws/ à la racine du lecteur (nom sans tenir compte des majuscules), relu toutes les 30 s.
+let rawRoot: { at: number; dir: Promise<{ path: string; folders: Map<string, string> } | null> } | null = null;
+
+const folderKey = (name: string) => name.normalize('NFC').toLowerCase().trim();
+
+async function findRawDir(folderName: string): Promise<string | null> {
+  if (!rawRoot || Date.now() - rawRoot.at > INDEX_TTL_MS) {
+    rawRoot = {
+      at: Date.now(),
+      dir: (async () => {
+        const entries = await fs.readdir(config.photosRoot, { withFileTypes: true });
+        const root = entries.find((e) => e.isDirectory() && ['raws', 'raw'].includes(e.name.toLowerCase()));
+        if (!root) return null;
+        const rootPath = path.join(config.photosRoot, root.name);
+        const folders = new Map<string, string>();
+        for (const e of await fs.readdir(rootPath, { withFileTypes: true })) {
+          if (e.isDirectory()) folders.set(folderKey(e.name), path.join(rootPath, e.name));
+        }
+        return { path: rootPath, folders };
+      })().catch(() => null),
+    };
+  }
+  const root = await rawRoot.dir;
+  return root?.folders.get(folderKey(folderName)) ?? null;
+}
+
 // Dimensions des images (lues dans l'en-tête du fichier), mémorisées sur disque
-// pour ne pas relire 200 fichiers à chaque redémarrage.
+// pour ne pas relire 200 fichiers à chaque redémarrage. Pour les RAW, on mémorise aussi
+// l'emplacement de l'aperçu JPEG intégré.
 const sizesFile = () => path.join(config.cacheDir, 'sizes.json');
-let sizes: Map<string, { width: number; height: number }> | null = null;
+interface KnownSize {
+  width: number;
+  height: number;
+  offset?: number;
+  length?: number;
+  rotate?: number;
+}
+let sizes: Map<string, KnownSize> | null = null;
 let saveTimer: NodeJS.Timeout | null = null;
 
-async function loadSizes(): Promise<Map<string, { width: number; height: number }>> {
+async function loadSizes(): Promise<Map<string, KnownSize>> {
   if (sizes) return sizes;
   try {
     sizes = new Map(Object.entries(JSON.parse(await fs.readFile(sizesFile(), 'utf8'))));
@@ -190,6 +265,23 @@ function scheduleSaveSizes(): void {
     await fs.writeFile(tmp, JSON.stringify(Object.fromEntries(sizes)));
     await fs.rename(tmp, sizesFile());
   }, 5000);
+}
+
+async function getRawInfo(filePath: string, size: number, mtimeMs: number) {
+  const known = await loadSizes();
+  const key = `raw|${filePath}|${size}|${Math.round(mtimeMs)}`;
+  const hit = known.get(key);
+  if (hit && hit.offset !== undefined && hit.length !== undefined) {
+    return { width: hit.width, height: hit.height, offset: hit.offset, length: hit.length, rotate: hit.rotate ?? 0 };
+  }
+  try {
+    const preview = await findRawPreview(filePath);
+    if (!preview) return null;
+    known.set(key, preview);
+    return preview;
+  } catch {
+    return null;
+  }
 }
 
 async function getImageSize(filePath: string, size: number, mtimeMs: number) {
@@ -254,22 +346,26 @@ async function doScan(): Promise<ScanResult> {
     if (!parsed) continue; // dossier des RAW, corbeille, autres dossiers…
 
     let imageCount = 0;
+    let rawCount = 0;
     try {
-      imageCount = (await getShootingIndex(entry.name, { fresh: true })).images.size;
+      const index = await getShootingIndex(entry.name, { fresh: true });
+      imageCount = index.images.size;
+      rawCount = [...index.images.values()].filter((v) => v.raw).length;
     } catch {
       continue; // dossier illisible
     }
     const { rows } = await pool.query<{ inserted: boolean }>(
-      `INSERT INTO shootings (folder_name, title, shot_date, date_precision, image_count, present)
-       VALUES ($1, $2, $3, $4, $5, true)
+      `INSERT INTO shootings (folder_name, title, shot_date, date_precision, image_count, raw_count, present)
+       VALUES ($1, $2, $3, $4, $5, $6, true)
        ON CONFLICT (folder_name) DO UPDATE
          SET title = EXCLUDED.title,
              shot_date = EXCLUDED.shot_date,
              date_precision = EXCLUDED.date_precision,
              image_count = EXCLUDED.image_count,
+             raw_count = EXCLUDED.raw_count,
              present = true
        RETURNING (xmax = 0) AS inserted`,
-      [entry.name, parsed.title, parsed.date, parsed.precision, imageCount],
+      [entry.name, parsed.title, parsed.date, parsed.precision, imageCount, rawCount],
     );
     if (rows[0]?.inserted) added++;
     seen.push(entry.name);
