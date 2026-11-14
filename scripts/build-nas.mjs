@@ -21,7 +21,6 @@ function run(cmd, args) {
   const result = spawnSync(cmd, args, {
     stdio: 'inherit',
     env: { ...process.env, APP_VERSION: version },
-    shell: process.platform === 'win32',
   });
   if (result.status !== 0) {
     console.error(`\n✖ Échec : ${cmd} ${args.join(' ')}`);
