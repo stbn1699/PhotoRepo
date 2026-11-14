@@ -47,7 +47,8 @@ Photographie/
 
 - La galerie affiche des miniatures (800 px) et la vue en grand un aperçu (2048 px). Les deux sont générés une fois puis gardés dans `data/cache`. Dès qu'un shooting apparaît, le serveur les prépare en arrière-plan.
 - Les téléchargements donnent **toujours le fichier d'origine**.
-- **Téléphone** : le site ouvre le menu « Partager » → « Enregistrer les images », et les photos vont directement dans la galerie du téléphone. Par paquets de 10 photos / 150 Mo maximum. Nécessite HTTPS.
+- **Android** : téléchargement direct, comme « Télécharger l'image » (plusieurs photos : l'une après l'autre ; Chrome demande une fois l'autorisation).
+- **iPhone / iPad** : un téléchargement y part dans l'app Fichiers, pas dans Photos. Le site ouvre donc le menu « Partager » → « Enregistrer les images », par paquets de 10 photos / 150 Mo maximum. Nécessite HTTPS.
 - **Ordinateur** : enregistrement dans un dossier choisi (Chrome, Edge), ou une par une dans Téléchargements.
 
 ## Administration

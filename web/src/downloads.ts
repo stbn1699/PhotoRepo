@@ -4,13 +4,19 @@ export interface DownloadItem {
   size: number;
 }
 
+/** iPhone / iPad (y compris les iPad qui se présentent comme un Mac). */
+function isIOS(): boolean {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
 /**
- * Téléphone/tablette capable d'envoyer des fichiers au menu « Partager » (→ « Enregistrer les images »).
- * Nécessite HTTPS. Sur ordinateur on préfère le téléchargement classique.
+ * Faut-il passer par le menu « Partager » (→ « Enregistrer les images ») ?
+ * Uniquement sur iPhone/iPad : un téléchargement y part dans l'app Fichiers, pas dans Photos.
+ * Partout ailleurs (Android, ordinateur), on télécharge directement, comme « Télécharger l'image ».
  */
 export function canShareFiles(): boolean {
+  if (!isIOS()) return false;
   if (!window.isSecureContext || typeof navigator.canShare !== 'function') return false;
-  if (!window.matchMedia('(pointer: coarse)').matches) return false;
   try {
     return navigator.canShare({ files: [new File([new Uint8Array(1)], 'test.jpg', { type: 'image/jpeg' })] });
   } catch {
@@ -18,9 +24,9 @@ export function canShareFiles(): boolean {
   }
 }
 
-/** Le navigateur sait enregistrer dans un dossier choisi (Chrome, Edge sur ordinateur). */
+/** Le navigateur sait enregistrer dans un dossier choisi (Chrome, Edge sur ordinateur, pas sur téléphone). */
 export function canPickFolder(): boolean {
-  return 'showDirectoryPicker' in window;
+  return 'showDirectoryPicker' in window && !window.matchMedia('(pointer: coarse)').matches;
 }
 
 // Un téléphone garde les photos en mémoire avant de les enregistrer : on envoie par paquets.
