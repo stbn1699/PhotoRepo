@@ -17,7 +17,7 @@ import { DownloadDialog } from '../components/DownloadDialog';
 import { Lightbox } from '../components/Lightbox';
 import { FadeImage } from '../components/FadeImage';
 import { Heart } from '../components/Heart';
-import { canShareFiles, triggerDownload, type DownloadItem } from '../downloads';
+import { triggerDownload, type DownloadItem } from '../downloads';
 
 export function ShootingPage() {
   const id = Number(useParams().id);
@@ -109,9 +109,7 @@ export function ShootingPage() {
   function downloadOne(img: GalleryImage, v: Version) {
     if (!isDownloadable(v)) return; // les RAW ne se téléchargent jamais
     const item = toItem(img, v, false);
-    // Téléphone : menu Partager pour enregistrer dans la galerie. Ordinateur : téléchargement direct.
-    if (canShareFiles()) setDownloadItems([item]);
-    else triggerDownload(item.url);
+    triggerDownload(item.url); // téléchargement direct, comme « Télécharger l'image »
   }
 
   function downloadMany(list: GalleryImage[]) {

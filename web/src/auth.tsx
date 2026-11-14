@@ -5,6 +5,8 @@ interface AuthState {
   user: User | null;
   loading: boolean;
   siteName: string;
+  /** Version du serveur (pour repérer une page restée sur une ancienne version). */
+  serverVersion: string | null;
   login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -15,12 +17,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [siteName, setSiteName] = useState('Galerie');
+  const [serverVersion, setServerVersion] = useState<string | null>(null);
 
   useEffect(() => {
     api
-      .get<{ name: string }>('/api/site')
+      .get<{ name: string; version: string | null }>('/api/site')
       .then((s) => {
         setSiteName(s.name);
+        setServerVersion(s.version);
         document.title = s.name;
       })
       .catch(() => {});
@@ -43,7 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }, []);
 
-  return <AuthContext.Provider value={{ user, loading, siteName, login, logout }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ user, loading, siteName, serverVersion, login, logout }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth(): AuthState {

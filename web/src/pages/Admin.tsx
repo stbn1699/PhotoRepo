@@ -9,13 +9,16 @@ import {
   type AdminUser,
 } from '../api';
 import { useAuth } from '../auth';
+import { versionLabel } from '../version';
 import { AccessList } from '../components/AccessList';
 import { generatePassword, PasswordField } from '../components/PasswordField';
 
 export function AdminTabs() {
   return (
     <div className="page-header">
-      <h1>Administration</h1>
+      <h1>
+        Administration <span className="version-chip">{versionLabel()}</span>
+      </h1>
       <nav className="tabs">
         <NavLink to="/admin/users">Utilisateurs</NavLink>
         <NavLink to="/admin/shootings">Accès par shooting</NavLink>

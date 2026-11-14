@@ -16,7 +16,10 @@ services:
       retries: 10
 
   app:
-    build: .
+    build:
+      context: .
+      args:
+        APP_VERSION: ${APP_VERSION:-dev}
     # Nom de l'image construite (c'est elle qu'on exporte en .tar pour le NAS).
     image: photorepo-app:latest
     container_name: photorepo-app

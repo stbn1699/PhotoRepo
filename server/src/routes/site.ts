@@ -4,7 +4,8 @@ import { loadSignature } from '../signature.js';
 
 /** Infos publiques du site (accessibles aussi depuis la page de connexion). */
 export async function siteRoutes(app: FastifyInstance): Promise<void> {
-  app.get('/api/site', async () => ({ name: config.siteName }));
+  // version : fixée à la construction de l'image Docker (vide en dev).
+  app.get('/api/site', async () => ({ name: config.siteName, version: process.env.APP_VERSION || null }));
 
   app.get('/api/signature', async (_request, reply) => {
     const signature = await loadSignature().catch(() => null);

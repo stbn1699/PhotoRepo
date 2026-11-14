@@ -6,6 +6,9 @@ COPY server/package.json server/
 COPY web/package.json web/
 RUN npm ci
 COPY . .
+# Numéro de version affiché à l'admin (calculé par « npm run nas » à partir de git).
+ARG APP_VERSION=dev
+ENV APP_VERSION=$APP_VERSION
 RUN npm run build
 
 # --- Image finale : uniquement ce qui sert à faire tourner le serveur ---
@@ -19,7 +22,9 @@ RUN npm ci --omit=dev --workspace server --include-workspace-root=false && npm c
 COPY --from=build /app/server/dist server/dist
 COPY --from=build /app/web/dist web/dist
 
-ENV API_PORT=3000 \
+ARG APP_VERSION=dev
+ENV APP_VERSION=$APP_VERSION \
+    API_PORT=3000 \
     PHOTOS_ROOT=/photos \
     CACHE_DIR=/cache \
     WEB_DIST=/app/web/dist

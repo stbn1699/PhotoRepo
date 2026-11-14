@@ -1418,3 +1418,34 @@ a.btn {
   padding: 0;
   background: none;
 }
+
+/* Version du site (admin) et bandeau de mise à jour */
+.version-footer {
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--muted);
+  opacity: 0.7;
+  padding: 0 16px 24px;
+}
+.version-chip {
+  font-size: 0.75rem;
+  font-weight: 500;
+  vertical-align: middle;
+  color: var(--muted);
+  background: var(--surface-2);
+  border-radius: 99px;
+  padding: 3px 10px;
+  margin-left: 8px;
+  white-space: nowrap;
+}
+.update-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 10px 16px;
+  background: rgba(232, 213, 181, 0.12);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.9rem;
+}

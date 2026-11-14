@@ -47,9 +47,8 @@ Photographie/
 
 - La galerie affiche des miniatures (800 px) et la vue en grand un aperçu (2048 px). Les deux sont générés une fois puis gardés dans `data/cache`. Dès qu'un shooting apparaît, le serveur les prépare en arrière-plan.
 - Les téléchargements donnent **toujours le fichier d'origine**.
-- **Android** : téléchargement direct, comme « Télécharger l'image » (plusieurs photos : l'une après l'autre ; Chrome demande une fois l'autorisation).
-- **iPhone / iPad** : un téléchargement y part dans l'app Fichiers, pas dans Photos. Le site ouvre donc le menu « Partager » → « Enregistrer les images », par paquets de 10 photos / 150 Mo maximum. Nécessite HTTPS.
-- **Ordinateur** : enregistrement dans un dossier choisi (Chrome, Edge), ou une par une dans Téléchargements.
+- Téléchargement **direct** partout, comme « Télécharger l'image » : Téléchargements sur ordinateur et Android, app Fichiers sur iPhone.
+- Plusieurs photos (« Tout télécharger », sélection) : elles se téléchargent l'une après l'autre ; le navigateur demande une fois l'autorisation.
 
 ## Administration
 
@@ -69,9 +68,10 @@ Bouton **Admin** en haut du site (visible seulement par l'admin) :
 ### 1. Préparer l'image sur le PC
 
 ```bash
-docker compose build app
-docker save photorepo-app:latest -o photorepo-app.tar
+npm run nas
 ```
+
+Ça construit l'image et l'exporte dans `nas-deploy/photorepo-app.tar`, avec un **numéro de version** (le nombre de commits, suivi de « + » s'il reste des modifications non commitées). Ce numéro et la date de construction s'affichent pour l'admin en bas des pages et dans *Administration* : tu sais tout de suite quelle version tourne. Si une page est restée ouverte sur une ancienne version après une mise à jour, un bandeau propose de recharger.
 
 À refaire à chaque mise à jour du code.
 
