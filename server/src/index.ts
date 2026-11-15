@@ -53,11 +53,24 @@ await app.register(activityRoutes);
 
 // En production, le même serveur sert le site React compilé.
 if (config.webDist && fs.existsSync(config.webDist)) {
-  await app.register(fastifyStatic, { root: config.webDist, wildcard: false });
+  // La page (index.html) ne doit jamais être gardée en cache : après une mise à jour, le navigateur
+  // récupère tout de suite la nouvelle version. Les fichiers de assets/ ont un nom qui change à
+  // chaque version : eux peuvent être gardés longtemps.
+  const NO_CACHE = 'no-cache, no-store, must-revalidate';
+  await app.register(fastifyStatic, {
+    root: config.webDist,
+    wildcard: false,
+    setHeaders(res, filePath) {
+      if (filePath.endsWith('.html')) res.header('Cache-Control', NO_CACHE);
+      else if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+        res.header('Cache-Control', 'public, max-age=31536000, immutable');
+      }
+    },
+  });
   const indexHtml = fs.readFileSync(path.join(config.webDist, 'index.html'));
   app.setNotFoundHandler((request, reply) => {
     if (request.method === 'GET' && !request.url.startsWith('/api/')) {
-      return reply.type('text/html').send(indexHtml);
+      return reply.header('Cache-Control', NO_CACHE).type('text/html').send(indexHtml);
     }
     return reply.code(404).send({ error: 'Introuvable' });
   });

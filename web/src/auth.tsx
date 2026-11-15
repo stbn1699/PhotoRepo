@@ -37,6 +37,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setLoading(false));
   }, []);
 
+  // Un onglet peut rester ouvert des jours sans être rechargé (surtout sur téléphone) : on revérifie
+  // la version du serveur quand on revient sur l'onglet et toutes les 5 minutes.
+  useEffect(() => {
+    const check = () =>
+      api
+        .get<{ version: string | null }>('/api/site')
+        .then((s) => setServerVersion(s.version))
+        .catch(() => {});
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void check();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    const timer = setInterval(check, 5 * 60 * 1000);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      clearInterval(timer);
+    };
+  }, []);
+
   const login = useCallback(async (username: string, password: string) => {
     const r = await api.post<{ user: User }>('/api/auth/login', { username, password });
     setUser(r.user);
