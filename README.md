@@ -48,7 +48,7 @@ Photographie/
 - La galerie affiche des miniatures (800 px) et la vue en grand un aperçu (2048 px). Les deux sont générés une fois puis gardés dans `data/cache`. Dès qu'un shooting apparaît, le serveur les prépare en arrière-plan.
 - Les téléchargements donnent **toujours le fichier d'origine**.
 - Téléchargement **direct** partout, comme « Télécharger l'image » : Téléchargements sur ordinateur et Android, app Fichiers sur iPhone.
-- Plusieurs photos (« Tout télécharger », sélection) : elles se téléchargent l'une après l'autre ; le navigateur demande une fois l'autorisation.
+- Plusieurs photos (« Tout télécharger », sélection) : **5 à la fois au maximum**, avec la progression de chacune. Une photo n'est enregistrée sur l'appareil qu'une fois entièrement reçue ; en cas de coupure elle est retentée 3 fois, puis proposée avec « Réessayer ». L'écran ne se met pas en veille pendant le téléchargement. Le navigateur demande une fois l'autorisation de télécharger plusieurs fichiers.
 
 ## Administration
 
